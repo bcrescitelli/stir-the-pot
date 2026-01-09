@@ -29,7 +29,9 @@ import {
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
-const firebaseConfig = {
+// Priority 1: Environment config (for Canvas preview)
+// Priority 2: User's hardcoded config (for Vercel/GitHub deployment)
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
   apiKey: "AIzaSyD_YGPU1QiWCsbKk7i7uLTRdvwNjock5HQ",
   authDomain: "stir-the-pot-game.firebaseapp.com",
   projectId: "stir-the-pot-game",
@@ -41,7 +43,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'stir-the-pot-game';
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'stir-the-pot-game';
 
 // --- Game Data & Constants ---
 const FLAVOR_POOL = {
@@ -74,12 +76,19 @@ export default function App() {
   const [playerName, setPlayerName] = useState('');
   const [error, setError] = useState('');
 
+  // Fixed Auth Logic with Error Handling (Fixes custom-token-mismatch)
   useEffect(() => {
     const initAuth = async () => {
-      // In a real environment, __initial_auth_token comes from your backend session
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          // Attempt sign-in with system token
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        // If token mismatch (due to custom project config in preview), fall back to anonymous
+        console.warn("Auth token error, falling back to anonymous sign-in:", err.message);
         await signInAnonymously(auth);
       }
     };
@@ -98,11 +107,15 @@ export default function App() {
         setError("Room closed.");
         setView('landing');
       }
-    }, (err) => console.error("Firestore Error:", err));
+    }, (err) => {
+      console.error("Firestore sync error:", err);
+      setError("Connection to room lost. Try refreshing.");
+    });
     return () => unsubscribe();
   }, [user, roomCode, view]);
 
   const handleCreateRoom = async () => {
+    if (!user) return;
     const code = generateRoomCode();
     const initialRoomState = {
       code,
@@ -116,39 +129,48 @@ export default function App() {
       scores: {},
       lastUpdated: Date.now()
     };
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code), initialRoomState);
-    setRoomCode(code);
-    setView('host');
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code), initialRoomState);
+      setRoomCode(code);
+      setView('host');
+    } catch (err) {
+      setError("Failed to create room. Please try again.");
+    }
   };
 
   const handleJoinRoom = async (code) => {
+    if (!user) return;
     const upperCode = code.toUpperCase();
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', upperCode);
-    const snap = await getDoc(roomRef);
     
-    if (!snap.exists()) {
-      setError("Room not found.");
-      return;
-    }
-    
-    const data = snap.data();
-    if (data.state !== 'LOBBY') {
-      setError("Game in progress.");
-      return;
-    }
-
-    await updateDoc(roomRef, {
-      [`players.${user.uid}`]: {
-        id: user.uid,
-        name: playerName || `Chef ${Math.floor(Math.random() * 900) + 100}`,
-        role: 'CHEF',
-        hand: [],
-        score: 0,
-        joinedAt: Date.now()
+    try {
+      const snap = await getDoc(roomRef);
+      if (!snap.exists()) {
+        setError("Room not found.");
+        return;
       }
-    });
-    setRoomCode(upperCode);
-    setView('player');
+      
+      const data = snap.data();
+      if (data.state !== 'LOBBY') {
+        setError("Game in progress.");
+        return;
+      }
+
+      await updateDoc(roomRef, {
+        [`players.${user.uid}`]: {
+          id: user.uid,
+          name: playerName || `Chef ${Math.floor(Math.random() * 900) + 100}`,
+          role: 'CHEF',
+          hand: [],
+          score: 0,
+          joinedAt: Date.now()
+        }
+      });
+      setRoomCode(upperCode);
+      setView('player');
+    } catch (err) {
+      setError("Error joining room.");
+    }
   };
 
   const handleStartGame = async () => {
