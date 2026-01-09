@@ -29,8 +29,6 @@ import {
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
-// Priority 1: Environment config (for Canvas preview)
-// Priority 2: User's hardcoded config (for Vercel/GitHub deployment)
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
   apiKey: "AIzaSyD_YGPU1QiWCsbKk7i7uLTRdvwNjock5HQ",
   authDomain: "stir-the-pot-game.firebaseapp.com",
@@ -65,7 +63,7 @@ const CATEGORIES = Object.keys(FLAVOR_POOL);
 
 // --- Utilities ---
 const generateRoomCode = () => Math.random().toString(36).substring(2, 6).toUpperCase();
-const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const getRandomItem = (arr) => arr[arr.length > 0 ? Math.floor(Math.random() * arr.length) : 0];
 const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
 export default function App() {
@@ -76,20 +74,21 @@ export default function App() {
   const [playerName, setPlayerName] = useState('');
   const [error, setError] = useState('');
 
-  // Fixed Auth Logic with Error Handling (Fixes custom-token-mismatch)
   useEffect(() => {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          // Attempt sign-in with system token
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
           await signInAnonymously(auth);
         }
       } catch (err) {
-        // If token mismatch (due to custom project config in preview), fall back to anonymous
         console.warn("Auth token error, falling back to anonymous sign-in:", err.message);
-        await signInAnonymously(auth);
+        try {
+          await signInAnonymously(auth);
+        } catch (anonErr) {
+          console.error("Critical Auth Failure:", anonErr);
+        }
       }
     };
     initAuth();
@@ -133,14 +132,17 @@ export default function App() {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code), initialRoomState);
       setRoomCode(code);
       setView('host');
+      setError('');
     } catch (err) {
-      setError("Failed to create room. Please try again.");
+      setError("Failed to create room. Check Firebase permissions.");
     }
   };
 
   const handleJoinRoom = async (code) => {
     if (!user) return;
-    const upperCode = code.toUpperCase();
+    const upperCode = code.trim().toUpperCase();
+    if (!upperCode) return;
+
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', upperCode);
     
     try {
@@ -168,6 +170,7 @@ export default function App() {
       });
       setRoomCode(upperCode);
       setView('player');
+      setError('');
     } catch (err) {
       setError("Error joining room.");
     }
@@ -218,6 +221,8 @@ export default function App() {
     if (!roomData || !user) return;
     const player = roomData.players[user.uid];
     const card = player.hand[cardIndex];
+    if (!card) return;
+
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
 
     const newHand = [...player.hand];
@@ -260,7 +265,7 @@ export default function App() {
   };
 
   const handleVote = async (targetId) => {
-    if (!roomData || !user) return;
+    if (!roomData || !user || roomData.votes?.[user.uid]) return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
     const currentVotes = { ...(roomData.votes || {}), [user.uid]: targetId };
     
@@ -270,13 +275,14 @@ export default function App() {
     if (Object.keys(currentVotes).length >= totalPlayers) {
       const tallies = {};
       Object.values(currentVotes).forEach(v => tallies[v] = (tallies[v] || 0) + 1);
-      const topVoted = Object.entries(tallies).sort((a,b) => b[1] - a[1])[0][0];
+      const sortedTallies = Object.entries(tallies).sort((a,b) => b[1] - a[1]);
+      const topVoted = sortedTallies[0][0];
       const saboteur = Object.values(roomData.players).find(p => p.role === 'SABOTEUR');
       
       await updateDoc(roomRef, {
         state: 'VOTE_REVEAL',
         voteWinner: topVoted,
-        voteSuccess: topVoted === saboteur.id
+        voteSuccess: topVoted === saboteur?.id
       });
     }
   };
@@ -310,6 +316,7 @@ export default function App() {
                 className="flex-1 p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-orange-500 uppercase text-center font-black tracking-[0.2em] text-lg"
                 placeholder="CODE"
                 maxLength={4}
+                value={roomCode}
                 onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
               />
               <button 
@@ -347,10 +354,10 @@ export default function App() {
               <h2 className="text-[12rem] font-black leading-none tracking-tighter drop-shadow-[0_20px_50px_rgba(249,115,22,0.3)]">{roomCode}</h2>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 w-full max-w-6xl">
-              {Object.values(roomData.players).map((p, i) => (
+              {Object.values(roomData.players).map((p) => (
                 <div key={p.id} className="bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 flex flex-col items-center gap-4">
                   <div className="w-16 h-16 rounded-full bg-orange-500 flex items-center justify-center font-black text-2xl shadow-lg">
-                    {p.name[0].toUpperCase()}
+                    {p.name[0]?.toUpperCase() || '?'}
                   </div>
                   <span className="font-black text-xl text-center truncate w-full">{p.name}</span>
                 </div>
@@ -441,7 +448,7 @@ export default function App() {
           </div>
         )}
 
-        {(roomData.state === 'ROUND_END' || roomData.state === 'VOTE_REVEAL') && (
+        {(roomData.state === 'VOTE_REVEAL' || roomData.state === 'ROUND_END') && (
            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8">
               <h2 className="text-9xl font-black">
                 {roomData.state === 'ROUND_END' ? 'RECIPE SUCCESS!' : roomData.voteSuccess ? 'SABOTEUR CAUGHT!' : 'WRONG CHEF FIRED!'}
@@ -460,7 +467,7 @@ export default function App() {
 
   if (view === 'player' && roomData) {
     const me = roomData.players[user.uid];
-    if (!me) return <div>Loading...</div>;
+    if (!me) return <div className="p-10 text-center font-bold">Joining...</div>;
 
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col p-4 font-sans select-none">
@@ -483,6 +490,7 @@ export default function App() {
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-6">
             <ChefHat size={60} className="text-orange-500 animate-bounce" />
             <h2 className="text-3xl font-black text-slate-900">Wait for Host</h2>
+            <p className="text-slate-500">Sharpening knives...</p>
           </div>
         )}
 
@@ -493,7 +501,7 @@ export default function App() {
               <h2 className="text-4xl font-black">{roomData.currentRecipe[roomData.recipeIndex] || 'DONE'}</h2>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {me.hand.map((card, idx) => (
+              {(me.hand || []).map((card, idx) => (
                 <button
                   key={idx}
                   onClick={() => handlePlayCard(idx)}
@@ -518,13 +526,26 @@ export default function App() {
                  onClick={() => handleVote(p.id)}
                  disabled={!!roomData.votes?.[user.uid]}
                  className={`w-full p-5 rounded-3xl border-2 font-black text-xl transition-all ${
-                   roomData.votes?.[user.uid] === p.id ? 'bg-red-500 border-red-600 text-white' : 'bg-white border-slate-200'
+                   roomData.votes?.[user.uid] === p.id 
+                    ? 'bg-red-500 border-red-600 text-white shadow-lg' 
+                    : 'bg-white border-slate-200'
                  }`}
                >
                  {p.name}
+                 {roomData.votes?.[user.uid] === p.id && <CheckCircle className="ml-2 inline" size={20} />}
                </button>
              ))}
           </div>
+        )}
+
+        {(roomData.state === 'ROUND_END' || roomData.state === 'VOTE_REVEAL') && (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-4">
+                 <div className="bg-slate-900 w-20 h-20 rounded-full flex items-center justify-center text-white mb-4">
+                   <RotateCcw size={32} className="animate-spin" />
+                 </div>
+                 <h2 className="text-3xl font-black">Recipe Over</h2>
+                 <p className="text-slate-500">Check the main screen!</p>
+            </div>
         )}
       </div>
     );
