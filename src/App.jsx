@@ -12,6 +12,7 @@ import {
 import { 
   getAuth, 
   signInAnonymously, 
+  signInWithCustomToken,
   onAuthStateChanged 
 } from 'firebase/auth';
 import { 
@@ -29,14 +30,16 @@ import {
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
-const firebaseConfig = {
-  apiKey: "AIzaSyD_YGPU1QiWCsbKk7i7uLTRdvwNjock5HQ",
-  authDomain: "stir-the-pot-game.firebaseapp.com",
-  projectId: "stir-the-pot-game",
-  storageBucket: "stir-the-pot-game.firebasestorage.app",
-  messagingSenderId: "490697693148",
-  appId: "1:490697693148:web:3515513c66df65f987e119"
-};
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "AIzaSyD_YGPU1QiWCsbKk7i7uLTRdvwNjock5HQ",
+      authDomain: "stir-the-pot-game.firebaseapp.com",
+      projectId: "stir-the-pot-game",
+      storageBucket: "stir-the-pot-game.firebasestorage.app",
+      messagingSenderId: "490697693148",
+      appId: "1:490697693148:web:3515513c66df65f987e119"
+    };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -71,9 +74,14 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        await signInAnonymously(auth);
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
       } catch (err) {
         console.error("Auth failed", err);
+        setError("Connection failed. Please refresh.");
       }
     };
     initAuth();
@@ -102,6 +110,7 @@ export default function App() {
       }
     }, (err) => {
       console.error("Snapshot error:", err);
+      setError("Disconnected from kitchen.");
     });
 
     return () => unsubscribe();
@@ -110,6 +119,7 @@ export default function App() {
   // --- Actions ---
   const createRoom = async () => {
     if (!user) return;
+    setError('');
     const newCode = generateRoomCode();
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', newCode);
     
@@ -130,41 +140,56 @@ export default function App() {
       turnOrder: []
     };
 
-    await setDoc(roomRef, initialData);
-    setRoomCode(newCode);
-    setRole('HOST');
-    setView('LOBBY');
+    try {
+      await setDoc(roomRef, initialData);
+      setRoomCode(newCode);
+      setRole('HOST');
+      setView('LOBBY');
+    } catch (err) {
+      console.error("Failed to create room:", err);
+      setError("Failed to open kitchen. Try again.");
+    }
   };
 
   const joinRoom = async () => {
-    if (!user || !roomCode || !playerName) return;
-    const cleanCode = roomCode.toUpperCase();
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', cleanCode);
-    const snapshot = await getDoc(roomRef);
-
-    if (!snapshot.exists()) {
-      setError('Room not found');
+    if (!user || !roomCode || !playerName) {
+      setError("Name and Code required");
       return;
     }
+    setError('');
+    const cleanCode = roomCode.toUpperCase();
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', cleanCode);
+    
+    try {
+      const snapshot = await getDoc(roomRef);
 
-    const updates = {};
-    updates[`players.${user.uid}`] = {
-      id: user.uid,
-      name: playerName,
-      score: 0,
-      ingredients: [],
-      isLockedOut: false,
-      ready: false
-    };
+      if (!snapshot.exists()) {
+        setError('Room not found');
+        return;
+      }
 
-    await updateDoc(roomRef, updates);
-    setRoomCode(cleanCode);
-    setRole('PLAYER');
-    setView('LOBBY');
+      const updates = {};
+      updates[`players.${user.uid}`] = {
+        id: user.uid,
+        name: playerName,
+        score: 0,
+        ingredients: [],
+        isLockedOut: false,
+        ready: false
+      };
+
+      await updateDoc(roomRef, updates);
+      setRoomCode(cleanCode);
+      setRole('PLAYER');
+      setView('LOBBY');
+    } catch (err) {
+      console.error("Failed to join room:", err);
+      setError("Failed to enter kitchen.");
+    }
   };
 
   // --- Renderers ---
-  if (!user) return <div className="min-h-screen bg-neutral-900 flex items-center justify-center text-white">Initializing Kitchen...</div>;
+  if (!user && !error) return <div className="min-h-screen bg-neutral-900 flex items-center justify-center text-white">Initializing Kitchen...</div>;
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-orange-500 selection:text-white overflow-hidden">
@@ -224,7 +249,12 @@ function LandingView({ setRoomCode, setPlayerName, createRoom, joinRoom, error }
         >
           Host on TV
         </button>
-        {error && <p className="text-red-500 text-center font-bold text-sm bg-red-500/10 p-2 rounded-lg">{error}</p>}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-xl flex items-center gap-2 text-red-500 font-bold text-sm justify-center">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -234,11 +264,15 @@ function LobbyView({ roomCode, roomData, role, appId }) {
   const players = roomData?.players ? Object.values(roomData.players) : [];
 
   const startGame = async () => {
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-    await updateDoc(roomRef, { 
-      status: 'PANTRY',
-      turnOrder: players.map(p => p.id).sort(() => Math.random() - 0.5)
-    });
+    try {
+      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+      await updateDoc(roomRef, { 
+        status: 'PANTRY',
+        turnOrder: players.map(p => p.id).sort(() => Math.random() - 0.5)
+      });
+    } catch (err) {
+      console.error("Start failed:", err);
+    }
   };
 
   return (
@@ -299,29 +333,33 @@ function PantryView({ roomCode, roomData, user, appId }) {
 
   const submitPantry = async () => {
     if (items.some(i => i.trim() === '')) return;
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-    
-    // Add items to shared pantry
-    await updateDoc(roomRef, {
-      pantry: arrayUnion(...items.map(i => i.trim().toUpperCase()))
-    });
+    try {
+      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+      
+      // Add items to shared pantry
+      await updateDoc(roomRef, {
+        pantry: arrayUnion(...items.map(i => i.trim().toUpperCase()))
+      });
 
-    // Mark self ready
-    const updateReady = {};
-    updateReady[`players.${user.uid}.ready`] = true;
-    await updateDoc(roomRef, updateReady);
+      // Mark self ready
+      const updateReady = {};
+      updateReady[`players.${user.uid}.ready`] = true;
+      await updateDoc(roomRef, updateReady);
+    } catch (err) {
+      console.error("Pantry failed:", err);
+    }
   };
 
   const checkAllReady = async () => {
     const players = Object.values(roomData.players);
-    if (players.every(p => p.ready) && players.length > 0) {
+    if (players.length > 0 && players.every(p => p.ready)) {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
       await updateDoc(roomRef, { status: 'PLAYING', activeChefId: roomData.turnOrder[0] });
     }
   };
 
   useEffect(() => {
-    if (roomData?.hostId === user.uid) {
+    if (roomData?.hostId === user.uid && roomData?.status === 'PANTRY') {
       checkAllReady();
     }
   }, [roomData, user.uid]);
@@ -380,13 +418,12 @@ function GameView({ roomCode, roomData, user, role, appId }) {
       // Start of a turn
       startTurn();
     }
-  }, [roomData.activeChefId]);
+    return () => clearInterval(timerInterval.current);
+  }, [roomData.activeChefId, isHost]);
 
   useEffect(() => {
     if (roomData.timer > 0) {
       setTimeLeft(roomData.timer);
-    } else if (roomData.timer === -1) {
-      // Turn ended logic
     }
   }, [roomData.timer]);
 
@@ -394,107 +431,113 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     const randomDish = DISH_NAMES[Math.floor(Math.random() * DISH_NAMES.length)];
     const randomIngredient = roomData.pantry[Math.floor(Math.random() * roomData.pantry.length)];
     
-    await updateDoc(roomRef, {
-      timer: ROUND_TIME,
-      dishName: randomDish,
-      currentIngredient: randomIngredient,
-      chefSuccessCount: 0,
-      completedIngredients: []
-    });
+    try {
+      await updateDoc(roomRef, {
+        timer: ROUND_TIME,
+        dishName: randomDish,
+        currentIngredient: randomIngredient,
+        chefSuccessCount: 0,
+        completedIngredients: []
+      });
 
-    let localTimer = ROUND_TIME;
-    timerInterval.current = setInterval(async () => {
-      localTimer -= 1;
-      if (localTimer <= 0) {
-        clearInterval(timerInterval.current);
-        endTurn();
-      } else {
-        await updateDoc(roomRef, { timer: localTimer });
-      }
-    }, 1000);
+      let localTimer = ROUND_TIME;
+      clearInterval(timerInterval.current);
+      timerInterval.current = setInterval(async () => {
+        localTimer -= 1;
+        if (localTimer <= 0) {
+          clearInterval(timerInterval.current);
+          endTurn();
+        } else {
+          await updateDoc(roomRef, { timer: localTimer });
+        }
+      }, 1000);
+    } catch (err) {
+      console.error("Turn start failed:", err);
+    }
   };
 
   const endTurn = async () => {
     const nextChefIndex = roomData.currentChefIndex + 1;
     let nextRound = roomData.currentRound;
     let nextChefId = '';
-    let status = 'PLAYING';
 
-    if (nextChefIndex >= roomData.turnOrder.length) {
-      // All players went in this round
-      if (nextRound < 3) {
-        nextRound += 1;
-        nextChefId = roomData.turnOrder[0];
-        await updateDoc(roomRef, { 
-          currentRound: nextRound, 
-          currentChefIndex: 0,
-          activeChefId: nextChefId,
-          timer: 0 // Will trigger startTurn for host
-        });
+    try {
+      if (nextChefIndex >= roomData.turnOrder.length) {
+        if (nextRound < 3) {
+          nextRound += 1;
+          nextChefId = roomData.turnOrder[0];
+          await updateDoc(roomRef, { 
+            currentRound: nextRound, 
+            currentChefIndex: 0,
+            activeChefId: nextChefId,
+            timer: 0
+          });
+        } else {
+          await updateDoc(roomRef, { status: 'GAME_OVER' });
+        }
       } else {
-        status = 'GAME_OVER';
-        await updateDoc(roomRef, { status: 'GAME_OVER' });
+        nextChefId = roomData.turnOrder[nextChefIndex];
+        await updateDoc(roomRef, { 
+          currentChefIndex: nextChefIndex,
+          activeChefId: nextChefId,
+          timer: 0
+        });
       }
-    } else {
-      nextChefId = roomData.turnOrder[nextChefIndex];
-      await updateDoc(roomRef, { 
-        currentChefIndex: nextChefIndex,
-        activeChefId: nextChefId,
-        timer: 0
-      });
+    } catch (err) {
+      console.error("End turn failed:", err);
     }
   };
 
   const handleGuess = async (guess) => {
     if (roomData.players[user.uid].isLockedOut) return;
     
-    if (guess === roomData.currentIngredient) {
-      // Correct!
-      const nextIngredient = roomData.pantry[Math.floor(Math.random() * roomData.pantry.length)];
-      
-      const updates = {
-        currentIngredient: nextIngredient,
-        chefSuccessCount: roomData.chefSuccessCount + 1,
-        completedIngredients: arrayUnion(roomData.currentIngredient)
-      };
+    try {
+      if (guess === roomData.currentIngredient) {
+        const nextIngredient = roomData.pantry[Math.floor(Math.random() * roomData.pantry.length)];
+        const updates = {
+          currentIngredient: nextIngredient,
+          chefSuccessCount: roomData.chefSuccessCount + 1,
+          completedIngredients: arrayUnion(roomData.currentIngredient)
+        };
 
-      // Add scores
-      updates[`players.${user.uid}.score`] = roomData.players[user.uid].score + 500;
-      updates[`players.${roomData.activeChefId}.score`] = roomData.players[roomData.activeChefId].score + 300;
+        updates[`players.${user.uid}.score`] = roomData.players[user.uid].score + 500;
+        updates[`players.${roomData.activeChefId}.score`] = roomData.players[roomData.activeChefId].score + 300;
 
-      // Unlock everyone
-      Object.keys(roomData.players).forEach(id => {
-        updates[`players.${id}.isLockedOut`] = false;
-      });
+        Object.keys(roomData.players).forEach(id => {
+          updates[`players.${id}.isLockedOut`] = false;
+        });
 
-      // Michelin Bonus Check
-      if (roomData.chefSuccessCount + 1 === 5) {
-        updates[`players.${roomData.activeChefId}.score`] = roomData.players[roomData.activeChefId].score + 1300; // 300 + 1000 bonus
+        if (roomData.chefSuccessCount + 1 === 5) {
+          updates[`players.${roomData.activeChefId}.score`] = (updates[`players.${roomData.activeChefId}.score`] || roomData.players[roomData.activeChefId].score) + 1000;
+        }
+
+        await updateDoc(roomRef, updates);
+        if ('vibrate' in navigator) navigator.vibrate(200);
+      } else {
+        const updates = {};
+        updates[`players.${user.uid}.score`] = Math.max(0, roomData.players[user.uid].score - 200);
+        updates[`players.${user.uid}.isLockedOut`] = true;
+        await updateDoc(roomRef, updates);
+        if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
       }
-
-      await updateDoc(roomRef, updates);
-      if ('vibrate' in navigator) navigator.vibrate(200);
-    } else {
-      // Wrong
-      const updates = {};
-      updates[`players.${user.uid}.score`] = Math.max(0, roomData.players[user.uid].score - 200);
-      updates[`players.${user.uid}.isLockedOut`] = true;
-      await updateDoc(roomRef, updates);
-      if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
+    } catch (err) {
+      console.error("Guess failed:", err);
     }
   };
 
   const skipIngredient = async () => {
     if (roomData.currentRound === 1) return;
-    const nextIngredient = roomData.pantry[Math.floor(Math.random() * roomData.pantry.length)];
-    const updates = { currentIngredient: nextIngredient };
-    updates[`players.${user.uid}.score`] = Math.max(0, roomData.players[user.uid].score - 100);
-    await updateDoc(roomRef, updates);
+    try {
+      const nextIngredient = roomData.pantry[Math.floor(Math.random() * roomData.pantry.length)];
+      const updates = { currentIngredient: nextIngredient };
+      updates[`players.${user.uid}.score`] = Math.max(0, roomData.players[user.uid].score - 100);
+      await updateDoc(roomRef, updates);
+    } catch (err) {
+      console.error("Skip failed:", err);
+    }
   };
 
   const currentChefName = roomData.players[roomData.activeChefId]?.name || "Chef";
-
-  // --- UI SWITCH ---
 
   if (isHost) {
     return (
@@ -519,7 +562,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
         </div>
 
         <div className="flex-1 grid grid-cols-12 gap-8">
-          {/* Main Visualizer */}
           <div className="col-span-8 bg-stone-900/40 rounded-[3rem] border-4 border-stone-900 p-12 flex flex-col items-center justify-center relative overflow-hidden">
              <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-orange-600 rounded-full blur-[160px]"></div>
@@ -528,7 +570,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              <p className="text-stone-500 font-black uppercase tracking-[0.2em] mb-4">Now Serving:</p>
              <h3 className="text-7xl font-black italic text-center mb-12 uppercase drop-shadow-2xl">"{roomData.dishName}"</h3>
 
-             {/* Pot Progress */}
              <div className="w-full max-w-2xl bg-stone-950 h-24 rounded-full border-4 border-stone-800 flex items-center px-4 gap-2 overflow-hidden relative">
                 {roomData.completedIngredients.map((ing, i) => (
                   <div key={i} className="flex-1 bg-orange-600 h-12 rounded-full flex items-center justify-center animate-in zoom-in duration-300">
@@ -547,7 +588,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              <p className="mt-8 text-stone-500 font-black uppercase tracking-widest text-sm">Ingredients Ready: {roomData.chefSuccessCount} / 5</p>
           </div>
 
-          {/* Right Sidebar - Lockouts & Scores */}
           <div className="col-span-4 flex flex-col gap-6">
             <div className="bg-stone-900 p-8 rounded-[2rem] border-2 border-stone-800">
               <h4 className="font-black uppercase text-red-500 mb-6 flex items-center gap-2">
@@ -625,7 +665,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     );
   }
 
-  // Regular Player (Guessing)
   const isLockedOut = roomData.players?.[user.uid]?.isLockedOut;
 
   return (
@@ -641,7 +680,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
           <div className="p-4 bg-stone-900 border-b-2 border-stone-800 flex justify-between items-center">
              <div>
                <p className="text-[10px] font-black uppercase text-stone-500">Current Score</p>
-               <p className="text-2xl font-black text-orange-500">{roomData.players[user.uid]?.score}</p>
+               <p className="text-2xl font-black text-orange-500">{roomData.players?.[user.uid]?.score || 0}</p>
              </div>
              <div className="text-right">
                 <p className="text-[10px] font-black uppercase text-stone-500">Cooking:</p>
@@ -669,23 +708,26 @@ function GameView({ roomCode, roomData, user, role, appId }) {
 
 function ResultsView({ roomData, roomCode, role, appId }) {
   const players = Object.values(roomData.players).sort((a,b) => b.score - a.score);
-  const winner = players[0];
 
   const resetGame = async () => {
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-    const updates = {
-      status: 'LOBBY',
-      currentRound: 1,
-      currentChefIndex: 0,
-      pantry: [],
-      completedIngredients: []
-    };
-    Object.keys(roomData.players).forEach(id => {
-      updates[`players.${id}.score`] = 0;
-      updates[`players.${id}.ready`] = false;
-      updates[`players.${id}.isLockedOut`] = false;
-    });
-    await updateDoc(roomRef, updates);
+    try {
+      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+      const updates = {
+        status: 'LOBBY',
+        currentRound: 1,
+        currentChefIndex: 0,
+        pantry: [],
+        completedIngredients: []
+      };
+      Object.keys(roomData.players).forEach(id => {
+        updates[`players.${id}.score`] = 0;
+        updates[`players.${id}.ready`] = false;
+        updates[`players.${id}.isLockedOut`] = false;
+      });
+      await updateDoc(roomRef, updates);
+    } catch (err) {
+      console.error("Reset failed:", err);
+    }
   };
 
   return (
