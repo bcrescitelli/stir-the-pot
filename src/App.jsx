@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -149,7 +149,6 @@ export default function App() {
     return () => unsubscribe();
   }, [activeRoomCode, user, role]);
 
-  // Request Motion Permission (iOS requirement)
   const requestMotion = async () => {
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
       try {
@@ -163,7 +162,6 @@ export default function App() {
     }
   };
 
-  // Actions
   const createRoom = async () => {
     if (!user) return;
     setError('');
@@ -189,7 +187,8 @@ export default function App() {
       turnOrder: [],
       intermissionTimer: 0,
       isGoldenOrder: false,
-      sabotages: {} // { userId: { type: 'SCRUB', progress: 0 } }
+      sabotages: {},
+      lastChefStats: null // Used for tally screen
     };
 
     try {
@@ -209,7 +208,7 @@ export default function App() {
       return;
     }
     setError('');
-    await requestMotion(); // Ask for sensor permission on join click
+    await requestMotion(); 
 
     const cleanCode = inputCode.toUpperCase();
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', cleanCode);
@@ -229,7 +228,7 @@ export default function App() {
         score: 0,
         isLockedOut: false,
         ready: false,
-        sabotageCharges: 3 // Everyone gets 3 scrub sabotages
+        sabotageCharges: 3 
       };
 
       await updateDoc(roomRef, updates);
@@ -269,17 +268,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-orange-500 selection:text-white overflow-hidden">
-      {role === 'HOST' && view === 'LOBBY' && (
-        <div className="fixed top-6 right-6 z-50 flex gap-2">
+      {role === 'HOST' && (view === 'LOBBY' || view === 'PANTRY') && (
+        <div className="fixed bottom-6 right-6 z-50 flex gap-2">
            <button 
             onClick={syncAudio}
-            className="p-4 bg-orange-600 hover:bg-orange-500 rounded-full border border-orange-400 transition-all active:scale-95 flex items-center gap-2 font-black text-xs uppercase"
+            className="p-4 bg-orange-600 hover:bg-orange-500 rounded-full border border-orange-400 transition-all active:scale-95 flex items-center gap-2 font-black text-xs uppercase shadow-2xl"
           >
             <Volume2 size={24} /> Sync Audio
           </button>
           <button 
             onClick={toggleMute}
-            className="p-4 bg-stone-900/50 hover:bg-stone-800 rounded-full border border-stone-800 transition-all active:scale-95"
+            className="p-4 bg-stone-900/50 hover:bg-stone-800 rounded-full border border-stone-800 transition-all active:scale-95 shadow-2xl"
           >
             {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
           </button>
@@ -447,7 +446,7 @@ function PantryView({ roomCode, roomData, user, role, appId }) {
         deck: shuffledDeck,
         status: 'INTERMISSION', 
         activeChefId: roomData.turnOrder[0],
-        intermissionTimer: 5 
+        intermissionTimer: 7 // Slightly longer for tally + next chef
       });
     }
   };
@@ -519,12 +518,13 @@ function PantryView({ roomCode, roomData, user, role, appId }) {
 function IntermissionView({ roomCode, roomData, role, user, appId }) {
   const isHost = role === 'HOST';
   const nextChef = roomData.players[roomData.activeChefId]?.name || "Someone";
-  const [localTimer, setLocalTimer] = useState(5);
+  const lastChefStats = roomData.lastChefStats;
+  const [localTimer, setLocalTimer] = useState(7);
   const countdownInterval = useRef(null);
 
   useEffect(() => {
     if (isHost) {
-      setLocalTimer(5);
+      setLocalTimer(7);
       clearInterval(countdownInterval.current);
       countdownInterval.current = setInterval(async () => {
         setLocalTimer(prev => {
@@ -546,18 +546,25 @@ function IntermissionView({ roomCode, roomData, role, user, appId }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 p-10 text-center">
-      <div className="animate-in zoom-in duration-500">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 p-10 text-center overflow-hidden">
+      <div className="animate-in zoom-in duration-500 max-w-full">
+        {lastChefStats && (
+          <div className="mb-12 animate-in slide-in-from-top-8 duration-700">
+             <p className="text-stone-500 font-black uppercase tracking-[0.3em] text-xs mb-2">Shift Tally</p>
+             <h3 className="text-4xl font-black italic text-orange-500 uppercase">{lastChefStats.name} prepped {lastChefStats.count} dishes!</h3>
+          </div>
+        )}
+
         <div className="bg-orange-600 p-8 rounded-[3rem] inline-block mb-10 shadow-2xl rotate-3">
-          <ChefHat size={120} className="text-white" />
+          <ChefHat size={80} className="text-white md:w-32 md:h-32" />
         </div>
-        <p className="text-stone-500 font-black uppercase tracking-[0.5em] text-sm mb-4">Next Chef Up:</p>
-        <h2 className="text-8xl font-black uppercase italic text-white tracking-tighter mb-12 leading-none">
+        <p className="text-stone-500 font-black uppercase tracking-[0.5em] text-xs mb-4">Next Chef Up:</p>
+        <h2 className="text-5xl md:text-8xl font-black uppercase italic text-white tracking-tighter mb-12 leading-none break-words px-4">
           {nextChef}
         </h2>
         <div className="flex flex-col items-center gap-4">
-           <div className="bg-stone-900 border-2 border-stone-800 w-32 h-32 rounded-full flex items-center justify-center">
-              <span className="text-6xl font-black text-orange-500 tabular-nums">{localTimer}</span>
+           <div className="bg-stone-900 border-2 border-stone-800 w-24 h-24 md:w-32 md:h-32 rounded-full flex items-center justify-center">
+              <span className="text-4xl md:text-6xl font-black text-orange-500 tabular-nums">{localTimer}</span>
            </div>
         </div>
       </div>
@@ -568,7 +575,7 @@ function IntermissionView({ roomCode, roomData, role, user, appId }) {
 function GameView({ roomCode, roomData, user, role, appId }) {
   const [timeLeft, setTimeLeft] = useState(ROUND_TIME);
   const [pantryShuffle, setPantryShuffle] = useState([]);
-  const [scrubProgress, setScrubProgress] = useState(0); // 0 to 100
+  const [scrubProgress, setScrubProgress] = useState(0); 
   const isChef = roomData.activeChefId === user.uid;
   const isHost = role === 'HOST';
   const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
@@ -587,7 +594,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
                       Math.abs(y - motionRef.current.lastY) + 
                       Math.abs(z - motionRef.current.lastZ);
 
-        if (delta > 15) { // Shake Threshold
+        if (delta > 15) { 
           setScrubProgress(prev => {
             const next = prev + 2;
             if (next >= 100) finishScrub();
@@ -612,7 +619,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
 
   const triggerSabotage = async (targetId) => {
     if (roomData.players[user.uid].sabotageCharges <= 0) return;
-    if (roomData.sabotages?.[targetId]) return; // Already sabotaged
+    if (roomData.sabotages?.[targetId]) return; 
     
     const updates = {};
     updates[`sabotages.${targetId}`] = { type: 'SCRUB', progress: 0 };
@@ -631,14 +638,17 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     };
   }, [roomData.activeChefId, isHost]);
 
+  // STABILIZED PANTRY SHUFFLE
+  // We only shuffle when the turn starts OR on the 15s interval, not on every re-render.
   useEffect(() => {
-    if (!isHost) {
+    if (!isHost && roomData.status === 'PLAYING') {
       const doShuffle = () => setPantryShuffle([...roomData.pantry].sort(() => Math.random() - 0.5));
       doShuffle();
+      clearInterval(shuffleInterval.current);
       shuffleInterval.current = setInterval(doShuffle, 15000); 
     }
     return () => clearInterval(shuffleInterval.current);
-  }, [roomData.pantry, isHost]);
+  }, [roomData.activeChefId, isHost]); // Only shuffle initially when the active chef changes
 
   useEffect(() => {
     if (roomData.timer > 0) setTimeLeft(roomData.timer);
@@ -657,7 +667,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
         chefSuccessCount: 0,
         completedIngredients: [],
         isGoldenOrder: Math.random() > 0.8,
-        sabotages: {} // Clear all sabotages for new turn
+        sabotages: {} 
       });
 
       let localTimer = ROUND_TIME;
@@ -680,6 +690,11 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     const nextChefIndex = roomData.currentChefIndex + 1;
     let nextRound = roomData.currentRound;
     
+    const stats = {
+       name: roomData.players[roomData.activeChefId]?.name,
+       count: roomData.chefSuccessCount
+    };
+
     if (nextChefIndex >= roomData.turnOrder.length) {
       if (nextRound < 3) {
         await updateDoc(roomRef, { 
@@ -687,7 +702,8 @@ function GameView({ roomCode, roomData, user, role, appId }) {
           currentRound: nextRound + 1,
           currentChefIndex: 0,
           activeChefId: roomData.turnOrder[0],
-          timer: 0
+          timer: 0,
+          lastChefStats: stats
         });
       } else {
         await updateDoc(roomRef, { status: 'GAME_OVER' });
@@ -697,14 +713,15 @@ function GameView({ roomCode, roomData, user, role, appId }) {
         status: 'INTERMISSION',
         currentChefIndex: nextChefIndex,
         activeChefId: roomData.turnOrder[nextChefIndex],
-        timer: 0
+        timer: 0,
+        lastChefStats: stats
       });
     }
   };
 
   const handleGuess = async (guess) => {
     if (roomData.players[user.uid].isLockedOut) return;
-    if (roomData.sabotages?.[user.uid]) return; // Cannot guess while scrubbing
+    if (roomData.sabotages?.[user.uid]) return; 
     
     try {
       if (guess === roomData.currentIngredient) {
@@ -827,9 +844,24 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   }
 
   const isScrubbing = roomData.sabotages?.[user.uid];
+  const isLockedOut = roomData.players?.[user.uid]?.isLockedOut;
+
+  if (isLockedOut) {
+    return (
+      <div className="min-h-screen bg-red-600 flex flex-col items-center justify-center p-10 text-center animate-in zoom-in duration-300 z-[100]">
+          <div className="bg-white p-8 rounded-[3rem] mb-10 transform -rotate-12 shadow-2xl">
+            <Skull size={120} className="text-red-600" />
+          </div>
+          <h2 className="text-7xl font-black uppercase italic text-white mb-8 leading-none tracking-tighter drop-shadow-lg">86'ed!</h2>
+          <div className="bg-black/30 p-8 rounded-[2.5rem] border-2 border-white/50 backdrop-blur-md">
+            <p className="text-white font-black uppercase text-xl tracking-widest leading-relaxed">Wait for the next order...</p>
+          </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`h-screen flex flex-col ${isScrubbing ? 'bg-blue-950' : roomData.players?.[user.uid]?.isLockedOut ? 'bg-red-950' : 'bg-stone-950'}`}>
+    <div className={`h-screen flex flex-col ${isScrubbing ? 'bg-blue-950' : 'bg-stone-950'}`}>
        {isScrubbing ? (
          <div className="flex-1 flex flex-col items-center justify-center p-10 text-center relative overflow-hidden">
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-50 mix-blend-overlay"></div>
@@ -854,9 +886,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-950">
-             {roomData.players?.[user.uid]?.isLockedOut && <div className="p-4 bg-red-600 text-white font-black text-center rounded-2xl animate-pulse">86'ed! Wait for next ingredient.</div>}
-             
-             {/* SABOTAGE PANEL */}
              <div className="p-4 bg-blue-950/30 rounded-3xl border-2 border-blue-900/50">
                 <p className="text-[10px] font-black uppercase text-blue-400 mb-4 tracking-[0.4em]">Sabotage a rival guesser:</p>
                 <div className="flex flex-wrap gap-2">
@@ -865,7 +894,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
                         key={p.id}
                         disabled={roomData.players[user.uid].sabotageCharges <= 0 || roomData.sabotages?.[p.id]}
                         onClick={() => triggerSabotage(p.id)}
-                        className="flex-1 bg-blue-600 disabled:opacity-30 disabled:grayscale text-white font-black px-4 py-3 rounded-xl text-xs uppercase flex items-center gap-2 justify-center"
+                        className="flex-1 bg-blue-600 disabled:opacity-30 disabled:grayscale text-white font-black px-4 py-3 rounded-xl text-xs uppercase flex items-center gap-2 justify-center shadow-lg"
                      >
                         <Hand size={14}/> {p.name}
                      </button>
@@ -879,9 +908,8 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              {pantryShuffle.map((ing, idx) => (
                <button
                  key={idx}
-                 disabled={roomData.players[user.uid].isLockedOut}
                  onClick={() => handleGuess(ing)}
-                 className="w-full bg-stone-900 border-2 border-stone-800 p-6 rounded-[1.5rem] text-left font-black uppercase text-lg text-white active:bg-orange-600 disabled:opacity-20"
+                 className="w-full bg-stone-900 border-2 border-stone-800 p-6 rounded-[1.5rem] text-left font-black uppercase text-lg text-white active:bg-orange-600 shadow-xl"
                >
                  {ing}
                </button>
@@ -898,7 +926,7 @@ function ResultsView({ roomData, roomCode, role, appId }) {
   const resetGame = async () => {
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-      const updates = { status: 'LOBBY', currentRound: 1, currentChefIndex: 0, pantry: [], deck: [], completedIngredients: [], sabotages: {} };
+      const updates = { status: 'LOBBY', currentRound: 1, currentChefIndex: 0, pantry: [], deck: [], completedIngredients: [], sabotages: {}, lastChefStats: null };
       Object.keys(roomData.players).forEach(id => {
         updates[`players.${id}.score`] = 0; updates[`players.${id}.ready`] = false; updates[`players.${id}.isLockedOut`] = false; updates[`players.${id}.sabotageCharges`] = 3;
       });
