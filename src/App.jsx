@@ -26,7 +26,9 @@ import {
   Utensils,
   Trophy,
   RotateCcw,
-  Skull
+  Skull,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -45,7 +47,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Update: Defaulting appId to 'stir-the-pot-game' to match your Firestore rules
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'stir-the-pot-game';
 
 // --- Constants & Helpers ---
@@ -67,13 +68,16 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('LANDING'); // LANDING, LOBBY, PANTRY, PLAYING, RESULTS
   const [role, setRole] = useState(null); // HOST, PLAYER
-  const [roomCode, setRoomCode] = useState('');
+  const [inputCode, setInputCode] = useState(''); // What the user types
+  const [activeRoomCode, setActiveRoomCode] = useState(''); // The code we are listening to
   const [roomData, setRoomData] = useState(null);
   const [playerName, setPlayerName] = useState('');
   const [error, setError] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
   
   const introAudio = useRef(null);
 
+  // Initialize Audio
   useEffect(() => {
     introAudio.current = new Audio('intro.mp3');
     introAudio.current.loop = true;
@@ -86,6 +90,7 @@ export default function App() {
     };
   }, []);
 
+  // Handle Auth
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -104,24 +109,30 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Room Listener
   useEffect(() => {
-    if (!roomCode || !user) return;
+    if (!activeRoomCode || !user) return;
 
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', activeRoomCode);
     
     const unsubscribe = onSnapshot(roomRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setRoomData(data);
         
-        if (data.status === 'LOBBY') setView('LOBBY');
-        if (data.status === 'PANTRY') setView('PANTRY');
-        if (data.status === 'PLAYING') setView('PLAYING');
-        if (data.status === 'GAME_OVER') setView('RESULTS');
+        // Only transition views if we have an established role (Host or joined Player)
+        const isParticipant = data.hostId === user.uid || (data.players && data.players[user.uid]);
+        
+        if (isParticipant) {
+          if (data.status === 'LOBBY') setView('LOBBY');
+          if (data.status === 'PANTRY') setView('PANTRY');
+          if (data.status === 'PLAYING') setView('PLAYING');
+          if (data.status === 'GAME_OVER') setView('RESULTS');
 
-        if (data.status !== 'LOBBY' && introAudio.current) {
-          introAudio.current.pause();
-          introAudio.current.currentTime = 0;
+          // Music Control
+          if (data.status !== 'LOBBY' && introAudio.current) {
+            introAudio.current.pause();
+          }
         }
       } else if (role === 'PLAYER') {
         setError('Room no longer exists.');
@@ -137,14 +148,18 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [roomCode, user, role]);
+  }, [activeRoomCode, user, role]);
 
+  // Actions
   const createRoom = async () => {
-    if (!user) {
-      setError("Authenticating... try again in a second.");
-      return;
-    }
+    if (!user) return;
     setError('');
+
+    // Capture user gesture for audio immediately
+    if (introAudio.current) {
+      introAudio.current.play().catch(e => console.warn("Audio play blocked:", e));
+    }
+
     const newCode = generateRoomCode();
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', newCode);
     
@@ -167,32 +182,26 @@ export default function App() {
 
     try {
       await setDoc(roomRef, initialData);
-      setRoomCode(newCode);
       setRole('HOST');
+      setActiveRoomCode(newCode); // This starts the listener
       setView('LOBBY');
-      
-      if (introAudio.current) {
-        introAudio.current.play().catch(e => {
-          console.warn("Audio autoplay blocked by browser policy.", e);
-        });
-      }
     } catch (err) {
       console.error("Failed to create room:", err);
       if (err.code === 'permission-denied') {
-        setError("Permission Denied: Ensure your rules allow 'artifacts/" + appId + "/{document=**}'");
+        setError("Permission Denied: Check Firestore rules.");
       } else {
-        setError("Failed to open kitchen. Error: " + err.code);
+        setError("Failed to open kitchen.");
       }
     }
   };
 
   const joinRoom = async () => {
-    if (!user || !roomCode || !playerName) {
+    if (!user || !inputCode || !playerName) {
       setError("Name and Code are required.");
       return;
     }
     setError('');
-    const cleanCode = roomCode.toUpperCase();
+    const cleanCode = inputCode.toUpperCase();
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', cleanCode);
     
     try {
@@ -214,12 +223,19 @@ export default function App() {
       };
 
       await updateDoc(roomRef, updates);
-      setRoomCode(cleanCode);
       setRole('PLAYER');
+      setActiveRoomCode(cleanCode); // This starts the listener
       setView('LOBBY');
     } catch (err) {
       console.error("Failed to join room:", err);
       setError("Failed to join: " + err.code);
+    }
+  };
+
+  const toggleMute = () => {
+    if (introAudio.current) {
+      introAudio.current.muted = !isMuted;
+      setIsMuted(!isMuted);
     }
   };
 
@@ -236,18 +252,28 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-orange-500 selection:text-white overflow-hidden">
-      {view === 'LANDING' && <LandingView setRoomCode={setRoomCode} setPlayerName={setPlayerName} createRoom={createRoom} joinRoom={joinRoom} error={error} />}
-      {view === 'LOBBY' && <LobbyView roomCode={roomCode} roomData={roomData} role={role} appId={appId} />}
-      {view === 'PANTRY' && <PantryView roomCode={roomCode} roomData={roomData} user={user} appId={appId} />}
-      {view === 'PLAYING' && <GameView roomCode={roomCode} roomData={roomData} user={user} role={role} appId={appId} />}
-      {view === 'RESULTS' && <ResultsView roomData={roomData} roomCode={roomCode} role={role} appId={appId} />}
+      {/* Global Sound Toggle */}
+      {role === 'HOST' && view === 'LOBBY' && (
+        <button 
+          onClick={toggleMute}
+          className="fixed top-6 right-6 z-50 p-4 bg-stone-900/50 hover:bg-stone-800 rounded-full border border-stone-800 transition-all active:scale-95"
+        >
+          {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+        </button>
+      )}
+
+      {view === 'LANDING' && <LandingView setInputCode={setInputCode} inputCode={inputCode} setPlayerName={setPlayerName} createRoom={createRoom} joinRoom={joinRoom} error={error} />}
+      {view === 'LOBBY' && <LobbyView roomCode={activeRoomCode} roomData={roomData} role={role} appId={appId} />}
+      {view === 'PANTRY' && <PantryView roomCode={activeRoomCode} roomData={roomData} user={user} appId={appId} />}
+      {view === 'PLAYING' && <GameView roomCode={activeRoomCode} roomData={roomData} user={user} role={role} appId={appId} />}
+      {view === 'RESULTS' && <ResultsView roomData={roomData} roomCode={activeRoomCode} role={role} appId={appId} />}
     </div>
   );
 }
 
 // --- View Components ---
 
-function LandingView({ setRoomCode, setPlayerName, createRoom, joinRoom, error }) {
+function LandingView({ setInputCode, inputCode, setPlayerName, createRoom, joinRoom, error }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950">
       <div className="mb-12 text-center animate-in fade-in zoom-in duration-700">
@@ -272,8 +298,9 @@ function LandingView({ setRoomCode, setPlayerName, createRoom, joinRoom, error }
         <input 
           type="text" 
           placeholder="ROOM CODE" 
+          value={inputCode}
           className="w-full bg-stone-800 border-2 border-stone-700 rounded-2xl px-6 py-4 text-center font-bold text-xl uppercase focus:border-orange-500 outline-none transition-all placeholder:opacity-30"
-          onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+          onChange={(e) => setInputCode(e.target.value.toUpperCase())}
         />
         <button 
           onClick={joinRoom}
@@ -301,7 +328,7 @@ function LandingView({ setRoomCode, setPlayerName, createRoom, joinRoom, error }
       </div>
       
       <div className="mt-12 text-stone-700 text-[10px] font-bold uppercase tracking-[0.2em]">
-        Ensure Firestore Rules match the App Path: /artifacts/{appId}/
+        Path: /artifacts/{appId}/
       </div>
     </div>
   );
