@@ -69,6 +69,22 @@ export default function App() {
   const [roomData, setRoomData] = useState(null);
   const [playerName, setPlayerName] = useState('');
   const [error, setError] = useState('');
+  
+  // Audio reference for the intro music
+  const introAudio = useRef(null);
+
+  // Initialize audio object once
+  useEffect(() => {
+    introAudio.current = new Audio('intro.mp3');
+    introAudio.current.loop = true;
+    
+    return () => {
+      if (introAudio.current) {
+        introAudio.current.pause();
+        introAudio.current = null;
+      }
+    };
+  }, []);
 
   // 1. Auth Initialization
   useEffect(() => {
@@ -104,6 +120,12 @@ export default function App() {
         if (data.status === 'PANTRY') setView('PANTRY');
         if (data.status === 'PLAYING') setView('PLAYING');
         if (data.status === 'GAME_OVER') setView('RESULTS');
+
+        // Stop intro music if the status leaves LOBBY
+        if (data.status !== 'LOBBY' && data.status !== 'PANTRY_WAIT' && introAudio.current) {
+          introAudio.current.pause();
+          introAudio.current.currentTime = 0;
+        }
       } else if (role === 'PLAYER') {
         setError('Room not found');
         setView('LANDING');
@@ -145,6 +167,11 @@ export default function App() {
       setRoomCode(newCode);
       setRole('HOST');
       setView('LOBBY');
+      
+      // Play intro music for the host
+      if (introAudio.current) {
+        introAudio.current.play().catch(e => console.log("Audio play blocked by browser:", e));
+      }
     } catch (err) {
       console.error("Failed to create room:", err);
       setError("Failed to open kitchen. Try again.");
