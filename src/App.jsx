@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
-// Prioritize environment-provided config, fallback to user-provided config
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
   : {
@@ -45,7 +44,9 @@ const firebaseConfig = typeof __firebase_config !== 'undefined'
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'stir-the-pot-v1';
+
+// Update: Defaulting appId to 'stir-the-pot-game' to match your Firestore rules
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'stir-the-pot-game';
 
 // --- Constants & Helpers ---
 const ROUND_TIME = 45;
@@ -71,10 +72,8 @@ export default function App() {
   const [playerName, setPlayerName] = useState('');
   const [error, setError] = useState('');
   
-  // Audio reference for the intro music
   const introAudio = useRef(null);
 
-  // Initialize audio object once
   useEffect(() => {
     introAudio.current = new Audio('intro.mp3');
     introAudio.current.loop = true;
@@ -87,7 +86,6 @@ export default function App() {
     };
   }, []);
 
-  // 1. Auth Initialization - Following Rule 3 strictly
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -106,11 +104,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Room Listener - Following Rule 1 & 2 strictly
   useEffect(() => {
     if (!roomCode || !user) return;
 
-    // Structure: /artifacts/{appId}/public/data/rooms/{roomId}
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
     
     const unsubscribe = onSnapshot(roomRef, (snapshot) => {
@@ -118,13 +114,11 @@ export default function App() {
         const data = snapshot.data();
         setRoomData(data);
         
-        // Sync View with Room Status
         if (data.status === 'LOBBY') setView('LOBBY');
         if (data.status === 'PANTRY') setView('PANTRY');
         if (data.status === 'PLAYING') setView('PLAYING');
         if (data.status === 'GAME_OVER') setView('RESULTS');
 
-        // Stop intro music if the status leaves LOBBY
         if (data.status !== 'LOBBY' && introAudio.current) {
           introAudio.current.pause();
           introAudio.current.currentTime = 0;
@@ -135,7 +129,6 @@ export default function App() {
       }
     }, (err) => {
       console.error("Snapshot error:", err);
-      // This is often where permission errors show up
       if (err.code === 'permission-denied') {
         setError("Firebase Permission Denied. Check your Firestore Rules.");
       } else {
@@ -146,7 +139,6 @@ export default function App() {
     return () => unsubscribe();
   }, [roomCode, user, role]);
 
-  // --- Actions ---
   const createRoom = async () => {
     if (!user) {
       setError("Authenticating... try again in a second.");
@@ -154,7 +146,6 @@ export default function App() {
     }
     setError('');
     const newCode = generateRoomCode();
-    // Rule 1 Pathing
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', newCode);
     
     const initialData = {
@@ -180,7 +171,6 @@ export default function App() {
       setRole('HOST');
       setView('LOBBY');
       
-      // Play intro music for the host (User gesture triggered)
       if (introAudio.current) {
         introAudio.current.play().catch(e => {
           console.warn("Audio autoplay blocked by browser policy.", e);
@@ -188,9 +178,8 @@ export default function App() {
       }
     } catch (err) {
       console.error("Failed to create room:", err);
-      // Detailed error for the user
       if (err.code === 'permission-denied') {
-        setError("Failed: Check Firestore Rules (enable 'Test Mode').");
+        setError("Permission Denied: Ensure your rules allow 'artifacts/" + appId + "/{document=**}'");
       } else {
         setError("Failed to open kitchen. Error: " + err.code);
       }
@@ -234,7 +223,6 @@ export default function App() {
     }
   };
 
-  // --- Renderers ---
   if (!user && !error) {
     return (
       <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center text-white p-6 text-center">
@@ -312,9 +300,8 @@ function LandingView({ setRoomCode, setPlayerName, createRoom, joinRoom, error }
         )}
       </div>
       
-      {/* Footer Info */}
       <div className="mt-12 text-stone-700 text-[10px] font-bold uppercase tracking-[0.2em]">
-        Ensure Firestore Rules are in "Test Mode" for Vercel deploy.
+        Ensure Firestore Rules match the App Path: /artifacts/{appId}/
       </div>
     </div>
   );
@@ -397,12 +384,10 @@ function PantryView({ roomCode, roomData, user, appId }) {
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
       
-      // Add items to shared pantry
       await updateDoc(roomRef, {
         pantry: arrayUnion(...items.map(i => i.trim().toUpperCase()))
       });
 
-      // Mark self ready
       const updateReady = {};
       updateReady[`players.${user.uid}.ready`] = true;
       await updateDoc(roomRef, updateReady);
@@ -418,7 +403,7 @@ function PantryView({ roomCode, roomData, user, appId }) {
       await updateDoc(roomRef, { 
         status: 'PLAYING', 
         activeChefId: roomData.turnOrder[0],
-        timer: 0 // Reset timer to trigger host startTurn logic
+        timer: 0 
       });
     }
   };
@@ -481,7 +466,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
   const timerInterval = useRef(null);
 
-  // Sync Timer Logic (Only Host controls the flow of time)
   useEffect(() => {
     if (isHost && roomData.activeChefId && roomData.timer === 0) {
       startTurn();
@@ -610,7 +594,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   if (isHost) {
     return (
       <div className="flex flex-col h-screen p-8 gap-8 overflow-hidden bg-stone-950">
-        {/* TV Top Bar */}
         <div className="flex justify-between items-center bg-stone-900 border-2 border-stone-800 p-8 rounded-[3rem] shadow-2xl">
            <div className="flex items-center gap-8">
               <div className="bg-orange-600 p-5 rounded-3xl shadow-lg shadow-orange-900/40">
