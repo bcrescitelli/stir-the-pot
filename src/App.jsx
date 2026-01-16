@@ -33,11 +33,11 @@ import {
   Star,
   Hand,
   Waves,
-  Compass,
   HandMetal,
   Dna,
   RefreshCcw,
-  ArrowRight
+  Thermometer,
+  Eraser
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -125,8 +125,12 @@ export default function App() {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setRoomData(data);
-        const isParticipant = data.hostId === user.uid || (data.players && data.players[user.uid]);
-        if (isParticipant) {
+        
+        // STRENGTHENED PARTICIPANT GUARD
+        const isHost = data.hostId === user.uid;
+        const isJoinedPlayer = data.players && data.players[user.uid];
+
+        if (isHost || isJoinedPlayer) {
           if (data.status === 'LOBBY') setView('LOBBY');
           if (data.status === 'INTERMISSION') setView('INTERMISSION');
           if (data.status === 'PLAYING') setView('PLAYING');
@@ -145,12 +149,8 @@ export default function App() {
   }, [activeRoomCode, user, role]);
 
   const requestPermissions = async () => {
-    // Both Motion and Orientation are needed for different sabotages
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
       try { await DeviceMotionEvent.requestPermission(); } catch(e) { console.error(e); }
-    }
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      try { await DeviceOrientationEvent.requestPermission(); } catch(e) { console.error(e); }
     }
   };
 
@@ -222,8 +222,8 @@ export default function App() {
     <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-orange-500 overflow-hidden">
       {role === 'HOST' && view !== 'LANDING' && view !== 'RESULTS' && (
         <div className="fixed bottom-6 right-6 z-50 flex gap-3">
-          <button onClick={() => { introAudio.current.play(); }} className="p-4 bg-orange-600 rounded-full border-4 border-orange-400 active:scale-90 shadow-2xl hover:bg-orange-500 transition-all"><Volume2 size={24} /></button>
-          <button onClick={() => { introAudio.current.muted = !isMuted; setIsMuted(!isMuted); }} className="p-4 bg-stone-800 rounded-full active:scale-90 border-4 border-stone-700 shadow-2xl">{isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}</button>
+          <button onClick={() => { if(introAudio.current) introAudio.current.play(); }} className="p-4 bg-orange-600 rounded-full border-4 border-orange-400 active:scale-90 shadow-2xl hover:bg-orange-500 transition-all"><Volume2 size={24} /></button>
+          <button onClick={() => { if(introAudio.current) { introAudio.current.muted = !isMuted; setIsMuted(!isMuted); } }} className="p-4 bg-stone-800 rounded-full active:scale-90 border-4 border-stone-700 shadow-2xl">{isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}</button>
         </div>
       )}
       {view === 'LANDING' && <LandingView setInputCode={setInputCode} inputCode={inputCode} setPlayerName={setPlayerName} createRoom={createRoom} joinRoom={joinRoom} error={error} />}
@@ -235,7 +235,7 @@ export default function App() {
   );
 }
 
-// --- View Components ---
+// --- Views ---
 
 function LandingView({ setInputCode, inputCode, setPlayerName, createRoom, joinRoom, error }) {
   return (
@@ -314,7 +314,7 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
           </div>
           <div className="text-right">
             <h2 className="text-5xl font-black italic text-orange-500 uppercase tracking-tighter">Kitchen Lobby</h2>
-            <p className="text-stone-500 font-bold uppercase tracking-[0.3em] text-sm mt-2 animate-pulse">Wait for Staff...</p>
+            <p className="text-stone-500 font-bold uppercase tracking-[0.3em] text-sm mt-2 animate-pulse">Waiting for Staff...</p>
           </div>
         </div>
         <div className="grid grid-cols-4 gap-6 w-full">
@@ -322,7 +322,7 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
             <div key={p.id} className={`bg-stone-900/50 border-2 p-8 rounded-[2.5rem] text-center space-y-3 transition-all duration-500 ${p.ready ? 'border-green-500 bg-green-950/10' : 'border-stone-800'}`}>
               <ChefHat className={`mx-auto ${p.ready ? 'text-green-500' : 'text-stone-600'}`} size={40} />
               <p className="text-xl font-black uppercase truncate tracking-tighter">{p.name}</p>
-              <p className={`text-[10px] font-black uppercase tracking-widest ${p.ready ? 'text-green-500' : 'text-stone-600'}`}>{p.ready ? 'Pantry Ready' : 'Entering 5 items...'}</p>
+              <p className={`text-[10px] font-black uppercase tracking-widest ${p.ready ? 'text-green-500' : 'text-stone-600'}`}>{p.ready ? 'Ready' : 'Entering items...'}</p>
             </div>
           ))}
           {Array.from({ length: Math.max(0, 4 - players.length) }).map((_, i) => (
@@ -336,26 +336,26 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
 
   return (
     <div className="min-h-screen p-6 flex flex-col bg-stone-950 overflow-y-auto pb-24">
-      <div className="text-center mb-6">
+      <div className="text-center mb-8">
         <h2 className="text-3xl font-black italic text-orange-500 uppercase tracking-tighter">Stock the Pantry</h2>
-        <p className="text-stone-500 font-bold uppercase text-[10px] tracking-widest mt-2 px-8">Submit 5 unique toxic ingredients.</p>
+        <p className="text-stone-500 font-bold uppercase text-[10px] tracking-widest mt-2 px-8">Add your items below to stock the shared kitchen deck.</p>
       </div>
       {!isReady ? (
         <div className="space-y-3 animate-in slide-in-from-bottom-8 duration-700">
           {items.map((v, i) => (
             <div key={i} className="relative">
-               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500/30 font-black italic">{i+1}</span>
-               <input maxLength={30} type="text" placeholder="Something toxic..." className="w-full bg-stone-900 pl-10 pr-4 py-4 rounded-xl font-black uppercase outline-none focus:border-orange-500 border-2 border-stone-800 transition-all text-lg" value={v} onChange={(e) => { const n = [...items]; n[i] = e.target.value; setItems(n); }} />
+               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500/30 font-black italic text-xl">{i+1}</span>
+               <input maxLength={30} type="text" placeholder="Add your items..." className={`w-full bg-stone-900 pl-10 pr-4 py-4 rounded-xl font-black uppercase outline-none focus:border-orange-500 border-2 ${localError.includes(v.toUpperCase()) && v !== '' ? 'border-red-500' : 'border-stone-800'} transition-all text-lg`} value={v} onChange={(e) => { const n = [...items]; n[i] = e.target.value; setItems(n); }} />
             </div>
           ))}
           {localError && <div className="p-3 bg-red-600/20 border border-red-500 text-red-500 font-black text-xs uppercase text-center rounded-xl">{localError}</div>}
-          <button onClick={submitPantry} className="w-full bg-orange-600 font-black py-5 rounded-2xl text-xl uppercase shadow-2xl mt-4 active:scale-95 transition-all">Submit ingredients</button>
+          <button onClick={submitPantry} className="w-full bg-orange-600 font-black py-6 rounded-[2rem] text-2xl uppercase shadow-2xl mt-8 active:scale-95 transition-all">Confirm Ingredients</button>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
-          <div className="bg-green-600 p-8 rounded-[3rem] shadow-2xl animate-bounce"><CheckCircle2 size={80} className="text-white" /></div>
-          <p className="text-3xl font-black uppercase italic tracking-tighter">Stocked!</p>
-          <p className="text-stone-600 font-black uppercase tracking-widest text-xs px-10 leading-relaxed">Wait for the Host to open the kitchen...</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 py-20">
+          <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
+          <p className="text-4xl font-black uppercase italic tracking-tighter">Ready!</p>
+          <p className="text-stone-500 font-black uppercase tracking-widest text-xs">Wait for Host to open the kitchen...</p>
         </div>
       )}
     </div>
@@ -393,7 +393,7 @@ function IntermissionView({ roomCode, roomData, role, user, appId, requestPermis
   };
 
   const handleChefReady = async () => {
-    await requestPermissions(); // Double check permissions for the new chef
+    await requestPermissions();
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
     await updateDoc(roomRef, { isChefReady: true });
   };
@@ -401,7 +401,7 @@ function IntermissionView({ roomCode, roomData, role, user, appId, requestPermis
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center max-w-[1200px] mx-auto w-full">
       <div className="w-full mb-8">
-        <p className="text-[10px] font-black text-stone-600 uppercase mb-4 tracking-[0.4em]">Current Leaderboard</p>
+        <p className="text-[10px] font-black text-stone-600 uppercase mb-4 tracking-[0.4em]">Leaderboard Standings</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
            {Object.values(roomData.players).sort((a,b) => b.score - a.score).map((p, i) => (
              <div key={p.id} className={`p-4 rounded-[1.5rem] border-2 transition-all ${i === 0 ? 'bg-orange-600/10 border-orange-500 shadow-xl' : 'bg-stone-900/50 border-stone-800'}`}>
@@ -416,8 +416,8 @@ function IntermissionView({ roomCode, roomData, role, user, appId, requestPermis
       <div className="flex flex-col items-center animate-in zoom-in duration-700">
         {lastChefStats && (
           <div className="mb-6 bg-white/5 p-5 rounded-[2rem] border border-white/10 backdrop-blur-md">
-             <p className="text-orange-500 font-black uppercase text-[10px] mb-1 tracking-widest">Shift Results</p>
-             <h3 className="text-2xl font-black italic uppercase text-white">{lastChefStats.name} prepped {lastChefStats.count} items!</h3>
+             <p className="text-orange-500 font-black uppercase text-[10px] mb-1 tracking-widest">Previous Shift</p>
+             <h3 className="text-2xl font-black italic uppercase text-white">{lastChefStats.name} prepped {lastChefStats.count} orders!</h3>
           </div>
         )}
         
@@ -439,7 +439,7 @@ function IntermissionView({ roomCode, roomData, role, user, appId, requestPermis
                 I'm Ready! <Play fill="currentColor" />
               </button>
             ) : (
-              <p className="text-stone-600 font-black uppercase italic tracking-widest text-sm animate-pulse">Wait for {nextChefName} to sharpen their knives...</p>
+              <p className="text-stone-600 font-black uppercase italic tracking-widest text-sm animate-pulse">Wait for {nextChefName} to prepare...</p>
             )}
           </div>
         )}
@@ -452,6 +452,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   const [timeLeft, setTimeLeft] = useState(ROUND_TIME);
   const [pantryShuffle, setPantryShuffle] = useState([]);
   const [sabProgress, setSabProgress] = useState(0); 
+  const [dialRotation, setDialRotation] = useState(0); // For manual oven dial
   const isChef = roomData.activeChefId === user.uid;
   const isHost = role === 'HOST';
   const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
@@ -462,10 +463,10 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   // --- 1. Sabotage Suite ---
   const triggerSabotage = async (tid) => {
     if (!tid) return;
-    const types = ['SCRUB', 'DIAL', 'WIPE'];
+    const types = ['SCRUB', 'DIAL', 'SCRATCH'];
     const type = types[Math.floor(Math.random() * types.length)];
     const updates = {};
-    updates[`sabotages.${tid}`] = { type, progress: 0, targetAngle: Math.floor(Math.random() * 360) };
+    updates[`sabotages.${tid}`] = { type, progress: 0, targetValue: type === 'DIAL' ? Math.floor(Math.random() * 300 + 100) : 0 };
     updates[`players.${user.uid}.sabotageCharges`] = (roomData.players[user.uid]?.sabotageCharges || 0) - 1;
     await updateDoc(roomRef, updates);
   };
@@ -474,29 +475,21 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     const updates = {}; updates[`sabotages.${user.uid}`] = null;
     await updateDoc(roomRef, updates);
     setSabProgress(0);
+    setDialRotation(0);
   };
 
+  // Sensor Logic for Shaking
   useEffect(() => {
     const sab = roomData.sabotages?.[user.uid];
-    if (!sab) return;
-    if (sab.type === 'SCRUB') {
+    if (sab?.type === 'SCRUB') {
       const handleMotion = (e) => {
         const { x, y, z } = e.accelerationIncludingGravity || { x:0, y:0, z:0 };
-        if (Math.abs(x - motionRef.current.lastX) + Math.abs(y - motionRef.current.lastY) > 15) {
-          setSabProgress(p => { if (p >= 100) { finishSab(); return 100; } return p + 2.5; });
-        }
+        const delta = Math.abs(x - motionRef.current.lastX) + Math.abs(y - motionRef.current.lastY);
+        if (delta > 15) setSabProgress(p => { if (p >= 100) { finishSab(); return 100; } return p + 3; });
         motionRef.current = { lastX: x, lastY: y, lastZ: z };
       };
       window.addEventListener('devicemotion', handleMotion);
       return () => window.removeEventListener('devicemotion', handleMotion);
-    }
-    if (sab.type === 'DIAL') {
-      const handleOrient = (e) => {
-        const diff = Math.abs((e.alpha || 0) - sab.targetAngle);
-        if (diff < 15) setSabProgress(p => { if (p >= 100) { finishSab(); return 100; } return p + 4.5; });
-      };
-      window.addEventListener('deviceorientation', handleOrient);
-      return () => window.removeEventListener('deviceorientation', handleOrient);
     }
   }, [roomData.sabotages?.[user.uid]]);
 
@@ -531,13 +524,12 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     const nextIdx = roomData.currentChefIndex + 1;
     const stats = { name: roomData.players[roomData.activeChefId]?.name, count: roomData.chefSuccessCount };
     if (nextIdx >= roomData.turnOrder.length) {
-      if (roomData.currentRound < 3) await updateDoc(roomRef, { status: 'INTERMISSION', currentRound: roomData.currentRound + 1, currentChefIndex: 0, activeChefId: roomData.turnOrder[0], timer: 0, lastChefStats: stats, isChefReady: false });
+      if (roomData.currentRound < 3) await updateDoc(roomRef, { status: 'INTERMISSION', currentRound: roomData.currentRound + 1, currentChefIndex: 0, activeChefId: roomData.turnOrder[0], timer: 0, lastChefStats: stats, isChefReady: false, intermissionTimer: 0 });
       else await updateDoc(roomRef, { status: 'GAME_OVER' });
-    } else await updateDoc(roomRef, { status: 'INTERMISSION', currentChefIndex: nextIdx, activeChefId: roomData.turnOrder[nextIdx], timer: 0, lastChefStats: stats, isChefReady: false });
+    } else await updateDoc(roomRef, { status: 'INTERMISSION', currentChefIndex: nextIdx, activeChefId: roomData.turnOrder[nextIdx], timer: 0, lastChefStats: stats, isChefReady: false, intermissionTimer: 0 });
   };
 
   // --- 3. UI Shuffling on SUCCESS ONLY ---
-  // Pantry stays persistent (doesn't lose ingredients) but the order changes for visual feedback
   useEffect(() => {
     if (!isHost && roomData.status === 'PLAYING') {
       setPantryShuffle([...roomData.pantry].sort(() => Math.random() - 0.5));
@@ -561,13 +553,56 @@ function GameView({ roomCode, roomData, user, role, appId }) {
       up[`players.${roomData.activeChefId}.score`] = (roomData.players[roomData.activeChefId]?.score || 0) + (300 * mult);
       Object.keys(roomData.players).forEach(id => { up[`players.${id}.isLockedOut`] = false; });
       await updateDoc(roomRef, up);
-      if ('vibrate' in navigator) navigator.vibrate(200);
     } else {
       const up = {}; up[`players.${user.uid}.isLockedOut`] = true;
       up[`players.${user.uid}.score`] = Math.max(0, (roomData.players[user.uid]?.score || 0) - (roomData.isGoldenOrder ? 600 : 200));
       await updateDoc(roomRef, up);
-      if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
     }
+  };
+
+  // Sabotage Renderers
+  const renderSabotage = () => {
+    const sab = roomData.sabotages[user.uid];
+    if (sab.type === 'SCRATCH') return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center" onPointerMove={(e) => { setSabProgress(p => { if (p >= 100) { finishSab(); return 100; } return p + 0.8; }); }}>
+        <Eraser size={100} className="text-blue-400 mb-8 animate-pulse" />
+        <h2 className="text-5xl font-black uppercase italic text-white mb-4">DIRTY PLATE!</h2>
+        <p className="text-xl font-bold text-blue-200 mb-10">SCRATCH AWAY THE GRIME WITH YOUR FINGER!</p>
+        <div className="relative w-64 h-64 rounded-full border-8 border-white/20 bg-stone-800 flex items-center justify-center overflow-hidden">
+           <div className="absolute inset-0 bg-stone-600 transition-opacity duration-300" style={{ opacity: Math.max(0, (100 - sabProgress) / 100) }}></div>
+           <Utensils size={80} className="text-white opacity-20" />
+        </div>
+      </div>
+    );
+    if (sab.type === 'DIAL') return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center" onPointerMove={(e) => { 
+          const rect = e.currentTarget.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
+          const normalized = (angle + 180) % 360; // 0-360
+          setDialRotation(normalized);
+          const currentTemp = Math.floor(normalized + 100);
+          if (Math.abs(currentTemp - sab.targetValue) < 10) finishSab();
+      }}>
+        <Thermometer size={100} className="text-orange-400 mb-8 animate-pulse" />
+        <h2 className="text-5xl font-black uppercase italic text-white mb-4">SET THE OVEN!</h2>
+        <p className="text-xl font-bold text-orange-200 mb-6 uppercase">Target: {sab.targetValue}°F</p>
+        <div className="w-64 h-64 rounded-full border-8 border-orange-500/50 bg-stone-900 flex items-center justify-center relative shadow-inner" style={{ transform: `rotate(${dialRotation}deg)` }}>
+           <div className="w-2 h-16 bg-white rounded-full absolute top-4 shadow-lg"></div>
+           <div className="text-white font-black text-2xl rotate-[-{dialRotation}deg]">{Math.floor(dialRotation + 100)}°</div>
+        </div>
+        <p className="mt-8 text-stone-500 font-bold uppercase text-xs">Drag around the dial with your finger</p>
+      </div>
+    );
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-10">
+        <Waves size={150} className="text-blue-400 animate-pulse" />
+        <h2 className="text-7xl font-black uppercase italic text-white">SCRUB!</h2>
+        <p className="text-xl font-bold text-blue-200 uppercase tracking-widest">SHAKE VIGOROUSLY!</p>
+        <div className="w-full max-w-md bg-blue-950 h-10 rounded-full border-4 border-white/20 overflow-hidden shadow-2xl relative"><div className="bg-white h-full transition-all duration-100 shadow-[0_0_20px_white]" style={{ width: `${sabProgress}%` }}></div></div>
+      </div>
+    );
   };
 
   if (isHost) {
@@ -588,7 +623,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              <p className="text-stone-600 font-black uppercase tracking-[0.4em] mb-6 text-sm">Now Cooking:</p>
              <h3 className="text-6xl font-black italic text-center mb-16 uppercase leading-none tracking-tighter drop-shadow-2xl">"{roomData.dishName}"</h3>
              <div className="w-full max-w-2xl bg-stone-950 h-32 rounded-full border-4 border-stone-800 flex items-center px-6 gap-3 shadow-2xl relative">
-                {roomData.completedIngredients.map((_, i) => <div key={i} className="flex-1 bg-orange-600 h-20 rounded-full flex items-center justify-center animate-in zoom-in border-b-4 border-orange-800"><CheckCircle2 className="text-white" size={32} /></div>)}
+                {roomData.completedIngredients.map((_, i) => <div key={i} className="flex-1 bg-orange-600 h-20 rounded-full flex items-center justify-center animate-in zoom-in border-b-4 border-orange-800 shadow-xl"><CheckCircle2 className="text-white" size={32} /></div>)}
                 {Array.from({ length: Math.max(0, 5 - roomData.completedIngredients.length) }).map((_, i) => <div key={i} className="flex-1 h-20 rounded-full border-2 border-stone-800 border-dashed opacity-20"></div>)}
              </div>
           </div>
@@ -617,12 +652,15 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   }
 
   if (isChef) {
+    // SAFE CONSTRAINTS LOOKUP
     const roundConstraints = [
       { title: "THE TRAINING SHIFT", text: "SAY ANYTHING!", text2: "Avoid words on the card", icon: <RefreshCcw /> },
       { title: "THE LUNCH RUSH", text: "ONE WORD ONLY!", text2: "One single word per item", icon: <Zap /> },
       { title: "KITCHEN NIGHTMARE", text: "SILENT CHARADES!", text2: "No talking. No noise.", icon: <Skull /> }
     ];
-    const constraint = roundConstraints[roomData.currentRound - 1];
+    const currentRoundIndex = Math.max(0, Math.min(roomData.currentRound - 1, 2));
+    const constraint = roundConstraints[currentRoundIndex];
+
     return (
       <div className="min-h-screen p-8 flex flex-col items-center justify-center bg-stone-950 text-center">
           <div className="mb-10">
@@ -640,7 +678,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              <div className="bg-stone-900 p-8 rounded-[3rem] border-4 border-stone-800"><p className="text-xs font-black text-stone-600 uppercase mb-1">Prepped</p><p className="text-6xl font-black text-orange-500">{roomData.chefSuccessCount}</p></div>
              <div className="bg-stone-900 p-8 rounded-[3rem] border-4 border-stone-800"><p className="text-xs font-black text-stone-600 uppercase mb-1">Time</p><p className={`text-6xl font-black ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>{timeLeft}</p></div>
           </div>
-          {roomData.currentRound > 1 && <button onClick={skipIngredient} className="mt-10 bg-red-600/10 text-red-500 px-10 py-5 rounded-full font-black uppercase tracking-[0.4em] text-xs hover:bg-red-600 hover:text-white transition-all">Skip Order (-100)</button>}
+          {roomData.currentRound > 1 && <button onClick={() => { if(window.confirm('Skip?')) skipIngredient(); }} className="mt-10 bg-red-600/10 text-red-500 px-10 py-5 rounded-full font-black uppercase tracking-[0.4em] text-xs hover:bg-red-600 hover:text-white transition-all">Skip Order (-100)</button>}
       </div>
     );
   }
@@ -648,35 +686,28 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   const activeSab = roomData.sabotages?.[user.uid];
   const isLockedOut = roomData.players?.[user.uid]?.isLockedOut;
 
+  // --- Intense 86'ed Lockout View ---
   if (isLockedOut) return (
     <div className="min-h-screen bg-red-600 flex flex-col items-center justify-center p-12 text-center animate-in zoom-in duration-300 z-[200] relative">
-      <div className="bg-white p-12 rounded-[3rem] mb-12 transform -rotate-12 shadow-2xl border-b-[16px] border-stone-200">
+      <div className="bg-white p-12 rounded-[3rem] mb-12 transform -rotate-12 shadow-2xl border-b-[16px] border-stone-200 relative z-10">
         <Skull size={180} className="text-red-600" />
       </div>
-      <h2 className="text-[6rem] md:text-[8rem] font-black uppercase italic text-white mb-6 leading-none tracking-tighter drop-shadow-2xl">86'ED!</h2>
-      <div className="bg-black/30 p-10 rounded-[2.5rem] border-4 border-white/30 backdrop-blur-xl">
+      <h2 className="text-[6rem] md:text-[8rem] font-black uppercase italic text-white mb-6 leading-none tracking-tighter drop-shadow-2xl relative z-10">86'ED!</h2>
+      <div className="bg-black/30 p-10 rounded-[2.5rem] border-4 border-white/30 backdrop-blur-xl relative z-10 max-w-md w-full">
         <p className="text-white font-black uppercase text-2xl tracking-[0.3em] leading-relaxed">OUT OF THE KITCHEN!</p>
-        <p className="text-red-200 font-bold uppercase text-xs mt-4 opacity-70">Wait for the next card to reappear...</p>
+        <p className="text-red-200 font-bold uppercase text-xs mt-4 opacity-70">Wait for the next order to deal...</p>
       </div>
     </div>
   );
 
   return (
     <div className={`h-screen flex flex-col ${activeSab ? 'bg-blue-900' : 'bg-stone-950'}`}>
-      {activeSab ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-10 relative overflow-hidden" 
-             onTouchMove={() => { if (activeSab.type === 'WIPE') setSabProgress(p => { if (p >= 100) { finishSab(); return 100; } return p + 3.5; }); }}>
-           {activeSab.type === 'SCRUB' && <><Waves size={150} className="text-blue-400 animate-pulse mb-4" /><h2 className="text-7xl font-black uppercase italic text-white">SCRUB!</h2><p className="text-xl font-bold text-blue-200 uppercase tracking-widest">SHAKE VIGOROUSLY!</p></>}
-           {activeSab.type === 'DIAL' && <><Compass size={150} className="text-blue-400 animate-spin-slow mb-4" /><h2 className="text-7xl font-black uppercase italic text-white">SET OVEN!</h2><p className="text-xl font-bold text-blue-200 uppercase tracking-widest">ROTATE PHONE!</p></>}
-           {activeSab.type === 'WIPE' && <><HandMetal size={150} className="text-blue-400 animate-bounce mb-4" /><h2 className="text-7xl font-black uppercase italic text-white">WIPE!</h2><p className="text-xl font-bold text-blue-200 uppercase tracking-widest">SWIPE SCREEN!</p></>}
-           <div className="w-full max-w-md bg-blue-950 h-10 rounded-full border-4 border-white/20 overflow-hidden shadow-2xl relative"><div className="bg-white h-full transition-all duration-100" style={{ width: `${sabProgress}%` }}></div></div>
-        </div>
-      ) : (
+      {activeSab ? renderSabotage() : (
         <>
           <div className="p-6 bg-stone-900 border-b-4 border-stone-800 flex justify-between items-center shadow-2xl">
              <div><p className="text-[10px] font-black uppercase text-stone-500 tracking-widest">Wallet</p><p className="text-4xl font-black text-orange-500 tabular-nums">{roomData.players?.[user.uid]?.score || 0}</p></div>
              <div className="text-right">
-                <p className="text-[10px] font-black uppercase text-stone-500 tracking-widest">Sabotages</p>
+                <p className="text-[10px] font-black uppercase text-stone-500 tracking-widest">Charges</p>
                 <div className="flex gap-1 justify-end">{Array.from({ length: 3 }).map((_, i) => <Zap key={i} size={24} className={i < (roomData.players?.[user.uid]?.sabotageCharges || 0) ? 'text-blue-500 fill-blue-500' : 'text-stone-700'} />)}</div>
              </div>
           </div>
@@ -684,7 +715,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              <div className="p-6 bg-blue-950/40 rounded-[2.5rem] border-2 border-blue-900/50 shadow-inner">
                 <div className="flex items-center gap-3 mb-4"><Skull className="text-blue-400" size={24} /><p className="text-xs font-black uppercase text-blue-400 tracking-[0.4em]">Sabotage a Rival:</p></div>
                 <div className="relative">
-                  <select className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black uppercase text-xl outline-none border-b-[10px] border-blue-800 transition-all appearance-none" onChange={(e) => { triggerSabotage(e.target.value); e.target.value = ''; }} disabled={(roomData.players?.[user.uid]?.sabotageCharges || 0) <= 0}>
+                  <select className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black uppercase text-xl outline-none border-b-[10px] border-blue-800 active:translate-y-1 transition-all appearance-none" onChange={(e) => { triggerSabotage(e.target.value); e.target.value = ''; }} disabled={(roomData.players?.[user.uid]?.sabotageCharges || 0) <= 0}>
                      <option value="">-- PICK VICTIM --</option>
                      {Object.values(roomData.players).filter(p => p.id !== user.uid && p.id !== roomData.activeChefId).map(p => <option key={p.id} value={p.id} disabled={roomData.sabotages?.[p.id]}>{p.name}</option>)}
                   </select>
@@ -693,7 +724,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              </div>
              <div className="space-y-3 pb-32">
                 <p className="text-[10px] font-black uppercase text-stone-700 tracking-[0.6em] text-center my-6">Select Ingredient</p>
-               {pantryShuffle.map((ing, idx) => <button key={idx} onClick={() => handleGuess(ing)} className="w-full bg-stone-900 border-b-[8px] border-stone-800 p-6 rounded-[2.5rem] text-left font-black uppercase text-xl text-white active:bg-orange-600 active:border-orange-800 active:translate-y-1 shadow-xl transition-all">{ing}</button>)}
+               {pantryShuffle.map((ing, idx) => <button key={idx} onClick={() => handleGuess(ing)} className="w-full bg-stone-900 border-b-[10px] border-stone-800 p-6 rounded-[2.5rem] text-left font-black uppercase text-xl text-white active:bg-orange-600 active:border-orange-800 active:translate-y-1 shadow-xl transition-all">{ing}</button>)}
              </div>
           </div>
         </>
@@ -715,7 +746,7 @@ function ResultsView({ roomData, roomCode, role, appId }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 p-4 text-center overflow-y-auto">
-        <div className="flex flex-col items-center mb-8 mt-4">
+        <div className="flex flex-col items-center mb-8 mt-4 animate-in zoom-in duration-500">
           <Trophy size={60} className="text-orange-500 mb-4 md:w-24 md:h-24" />
           <h1 className="text-5xl md:text-8xl font-black italic uppercase text-white leading-none tracking-tighter drop-shadow-2xl">THE VERDICT</h1>
         </div>
