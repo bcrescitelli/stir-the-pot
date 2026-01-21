@@ -37,7 +37,9 @@ import {
   Dna,
   RefreshCcw,
   Thermometer,
-  Eraser
+  Eraser,
+  Eye,
+  Maximize
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -61,15 +63,14 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'stir-the-pot-game';
 // --- Constants ---
 const ROUND_TIME = 45;
 const DISH_NAMES = [
-  "The Sunday Morning Mistake",
-  "The Boss's Retirement Party",
-  "A Wedding to Forget",
-  "Last Night's Regrets",
-  "The Health Inspector's Nightmare",
-  "Roommate's Mystery Tupperware",
-  "The First Date Disaster",
-  "Midnight Gas Station Run",
-  "Grandma's Secret 'Medicine'"
+  "THE VELVET TURTLE",
+  "NEON NOODLE SURPRISE",
+  "THE COCAINE OMELETTE",
+  "CHROME LOBSTER",
+  "MINT JULEP MISTAKE",
+  "THE MIDNIGHT QUICHE",
+  "SYNTHESIZER SOUFFLÉ",
+  "EDITORIAL ASPIC"
 ];
 
 const generateRoomCode = () => Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -126,7 +127,6 @@ export default function App() {
         const data = snapshot.data();
         setRoomData(data);
         
-        // STRENGTHENED PARTICIPANT GUARD
         const isHost = data.hostId === user.uid;
         const isJoinedPlayer = data.players && data.players[user.uid];
 
@@ -216,16 +216,20 @@ export default function App() {
     } catch (e) { setError("Join failed."); }
   };
 
-  if (!user && !error) return <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center text-orange-500 font-black uppercase tracking-widest"><Utensils className="animate-spin mb-4" size={48} />Preheating...</div>;
+  if (!user && !error) return <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center text-cyan-400 font-mono uppercase tracking-[0.5em] animate-pulse">Initializing System...</div>;
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-orange-500 overflow-hidden">
+    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-fuchsia-500 overflow-hidden relative">
+      {/* Editorial Grain Overlay */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] z-50"></div>
+      
       {role === 'HOST' && view !== 'LANDING' && view !== 'RESULTS' && (
-        <div className="fixed bottom-6 right-6 z-50 flex gap-3">
-          <button onClick={() => { if(introAudio.current) introAudio.current.play(); }} className="p-4 bg-orange-600 rounded-full border-4 border-orange-400 active:scale-90 shadow-2xl hover:bg-orange-500 transition-all"><Volume2 size={24} /></button>
-          <button onClick={() => { if(introAudio.current) { introAudio.current.muted = !isMuted; setIsMuted(!isMuted); } }} className="p-4 bg-stone-800 rounded-full active:scale-90 border-4 border-stone-700 shadow-2xl">{isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}</button>
+        <div className="fixed top-6 right-6 z-50 flex gap-1">
+          <button onClick={() => { if(introAudio.current) introAudio.current.play(); }} className="p-3 bg-zinc-900 border border-zinc-700 text-fuchsia-500 hover:bg-fuchsia-500 hover:text-white transition-all"><Volume2 size={18} /></button>
+          <button onClick={() => { if(introAudio.current) { introAudio.current.muted = !isMuted; setIsMuted(!isMuted); } }} className="p-3 bg-zinc-900 border border-zinc-700 text-cyan-400">{isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
         </div>
       )}
+      
       {view === 'LANDING' && <LandingView setInputCode={setInputCode} inputCode={inputCode} setPlayerName={setPlayerName} createRoom={createRoom} joinRoom={joinRoom} error={error} />}
       {view === 'LOBBY' && <LobbyView roomCode={activeRoomCode} roomData={roomData} role={role} user={user} appId={appId} />}
       {view === 'INTERMISSION' && <IntermissionView roomCode={activeRoomCode} roomData={roomData} role={role} user={user} appId={appId} requestPermissions={requestPermissions} />}
@@ -239,21 +243,33 @@ export default function App() {
 
 function LandingView({ setInputCode, inputCode, setPlayerName, createRoom, joinRoom, error }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-900/30 via-stone-950 to-stone-950">
-      <div className="mb-12 text-center animate-in fade-in duration-1000">
-        <div className="bg-orange-600 p-6 rounded-[2rem] rotate-12 shadow-2xl mb-8 inline-block shadow-orange-900/50">
-          <Utensils size={64} className="text-white -rotate-12" />
+    <div className="flex flex-col items-center justify-center min-h-screen p-6">
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,_#222_0%,_#000_100%)] opacity-50"></div>
+      
+      <div className="mb-12 text-center relative z-10">
+        <div className="mb-4 inline-block border-[4px] border-fuchsia-500 p-2 shadow-[8px_8px_0px_0px_rgba(217,70,239,0.3)]">
+            <Utensils size={48} className="text-fuchsia-500" />
         </div>
-        <h1 className="text-7xl font-black italic tracking-tighter uppercase leading-none text-white drop-shadow-2xl">Stir the <span className="text-orange-500 underline decoration-8 decoration-orange-600/50 underline-offset-8">Pot</span></h1>
-        <p className="text-stone-400 mt-6 font-bold uppercase tracking-[0.4em] text-xs">High-Stakes Kitchen Sabotage</p>
+        <h1 className="text-8xl font-serif italic font-black tracking-tighter uppercase leading-[0.8] text-white">
+          STIR <br/>
+          <span className="text-fuchsia-500">THE</span> <br/>
+          POT
+        </h1>
+        <div className="h-1 w-full bg-cyan-400 mt-4 shadow-[0_0_15px_#22d3ee]"></div>
+        <p className="text-cyan-400 mt-2 font-mono uppercase tracking-[0.6em] text-[10px]">A Gourmet Sabotage Collective</p>
       </div>
-      <div className="w-full max-w-sm space-y-4 bg-stone-900/60 p-8 rounded-[2.5rem] border-2 border-stone-800 backdrop-blur-xl shadow-2xl">
-        <input type="text" placeholder="CHEF NAME" className="w-full bg-stone-800 border-2 border-stone-700 rounded-xl p-4 text-center font-black text-lg uppercase focus:border-orange-500 outline-none transition-all placeholder:opacity-20" onChange={(e) => setPlayerName(e.target.value)} />
-        <input type="text" placeholder="ROOM CODE" value={inputCode} className="w-full bg-stone-800 border-2 border-stone-700 rounded-xl p-4 text-center font-black text-lg uppercase focus:border-orange-500 outline-none transition-all placeholder:opacity-20" onChange={(e) => setInputCode(e.target.value.toUpperCase())} />
-        <button onClick={joinRoom} className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-5 rounded-xl text-xl uppercase shadow-xl transform active:scale-95 transition-all">Join Game</button>
-        <button onClick={createRoom} className="w-full bg-stone-800 text-stone-300 font-bold py-4 rounded-xl uppercase transition-all">Host on TV</button>
-        {error && <div className="text-red-500 font-black text-center text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/50">{error}</div>}
+
+      <div className="w-full max-w-xs space-y-1 relative z-10">
+        <input type="text" placeholder="IDENTITY" className="w-full bg-transparent border-2 border-zinc-800 p-4 font-mono text-sm uppercase focus:border-cyan-400 outline-none transition-all placeholder:text-zinc-700" onChange={(e) => setPlayerName(e.target.value)} />
+        <input type="text" placeholder="ACCESS CODE" value={inputCode} className="w-full bg-transparent border-2 border-zinc-800 p-4 font-mono text-sm uppercase focus:border-cyan-400 outline-none transition-all placeholder:text-zinc-700" onChange={(e) => setInputCode(e.target.value.toUpperCase())} />
+        
+        <button onClick={joinRoom} className="w-full bg-fuchsia-600 text-white font-serif italic font-black py-4 text-2xl uppercase shadow-[4px_4px_0px_0px_#701a75] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all mt-4">Enter Salon</button>
+        <button onClick={createRoom} className="w-full border-2 border-zinc-700 text-zinc-500 font-mono py-2 text-xs uppercase hover:text-cyan-400 hover:border-cyan-400 transition-all">Host Private View</button>
+        
+        {error && <div className="text-fuchsia-500 font-mono text-[10px] text-center mt-4 tracking-widest">{error}</div>}
       </div>
+
+      <div className="fixed bottom-8 left-8 text-[8px] font-mono text-zinc-800 uppercase vertical-text tracking-[1em] select-none">Issue № 84 • Spring Edition</div>
     </div>
   );
 }
@@ -268,18 +284,10 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
   const submitPantry = async () => {
     setLocalError('');
     if (items.some(i => i.trim() === '')) {
-      setLocalError("Fill all 5 boxes!");
+      setLocalError("INCOMPLETE MANIFEST");
       return;
     }
     const cleanItems = items.map(i => i.trim().toUpperCase());
-    const existingPantry = roomData.pantry || [];
-    
-    const duplicate = cleanItems.find(i => existingPantry.includes(i));
-    if (duplicate) {
-      setLocalError(`DUPLICATE FOUND: "${duplicate}"`);
-      return;
-    }
-
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
       await updateDoc(roomRef, { pantry: arrayUnion(...cleanItems) });
@@ -306,56 +314,52 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
 
   if (isHost) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-10 max-w-[1200px] mx-auto w-full">
-        <div className="w-full flex justify-between items-start mb-16">
-          <div className="bg-white text-black p-8 rounded-[2.5rem] shadow-2xl transform -rotate-3 border-b-8 border-stone-300">
-            <p className="text-[10px] font-black opacity-40 uppercase mb-1">Room Code</p>
-            <p className="text-8xl font-black leading-none tracking-tighter tabular-nums">{roomCode}</p>
+      <div className="flex flex-col min-h-screen p-12 bg-zinc-50 text-black">
+        <div className="flex justify-between items-end border-b-4 border-black pb-8 mb-12">
+          <div>
+            <h2 className="text-9xl font-serif italic font-black leading-none tracking-tighter">THE <br/>LOBBY</h2>
           </div>
           <div className="text-right">
-            <h2 className="text-5xl font-black italic text-orange-500 uppercase tracking-tighter">Kitchen Lobby</h2>
-            <p className="text-stone-500 font-bold uppercase tracking-[0.3em] text-sm mt-2 animate-pulse">Waiting for Staff...</p>
+             <p className="font-mono text-xs uppercase tracking-[0.4em] mb-2">Access Key</p>
+             <p className="text-7xl font-mono font-black border-4 border-black px-6 py-2 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-fuchsia-500 text-white">{roomCode}</p>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-6 w-full">
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
           {players.map(p => (
-            <div key={p.id} className={`bg-stone-900/50 border-2 p-8 rounded-[2.5rem] text-center space-y-3 transition-all duration-500 ${p.ready ? 'border-green-500 bg-green-950/10' : 'border-stone-800'}`}>
-              <ChefHat className={`mx-auto ${p.ready ? 'text-green-500' : 'text-stone-600'}`} size={40} />
-              <p className="text-xl font-black uppercase truncate tracking-tighter">{p.name}</p>
-              <p className={`text-[10px] font-black uppercase tracking-widest ${p.ready ? 'text-green-500' : 'text-stone-600'}`}>{p.ready ? 'Ready' : 'Entering items...'}</p>
+            <div key={p.id} className={`border-2 p-6 transition-all ${p.ready ? 'bg-black text-white' : 'bg-transparent border-black/20 text-black/40'}`}>
+              <ChefHat size={24} className="mb-4" />
+              <p className="text-2xl font-serif italic font-black uppercase leading-none">{p.name}</p>
+              <p className="font-mono text-[10px] mt-2 uppercase tracking-widest">{p.ready ? 'Manifest Confirmed' : 'Pending...'}</p>
             </div>
           ))}
-          {Array.from({ length: Math.max(0, 4 - players.length) }).map((_, i) => (
-             <div key={i} className="border-2 border-stone-900 border-dashed p-8 rounded-[2.5rem] flex items-center justify-center opacity-20"><Users size={32}/></div>
-          ))}
         </div>
-        <button disabled={players.length < 2 || !players.every(p => p.ready)} onClick={startGame} className="mt-16 px-16 py-6 bg-orange-600 text-white font-black text-3xl rounded-[2.5rem] shadow-2xl disabled:opacity-30 disabled:grayscale uppercase active:scale-95 transition-all">Start Game</button>
+
+        <button disabled={players.length < 2 || !players.every(p => p.ready)} onClick={startGame} className="w-full bg-cyan-400 text-black border-4 border-black p-8 font-serif italic font-black text-5xl uppercase mt-12 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] hover:bg-fuchsia-500 hover:text-white disabled:opacity-20 transition-all">Open the Gallery</button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-6 flex flex-col bg-stone-950 overflow-y-auto pb-24">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-black italic text-orange-500 uppercase tracking-tighter">Stock the Pantry</h2>
-        <p className="text-stone-500 font-bold uppercase text-[10px] tracking-widest mt-2 px-8">Add your items below to stock the shared kitchen deck.</p>
+    <div className="min-h-screen p-8 flex flex-col max-w-md mx-auto">
+      <div className="mb-12 border-l-4 border-fuchsia-500 pl-6">
+        <h2 className="text-5xl font-serif italic font-black text-white uppercase leading-none">THE <br/>MANIFEST</h2>
+        <p className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest mt-4">Provide five elements for the seasonal collection.</p>
       </div>
+
       {!isReady ? (
-        <div className="space-y-3 animate-in slide-in-from-bottom-8 duration-700">
+        <div className="space-y-2">
           {items.map((v, i) => (
-            <div key={i} className="relative">
-               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500/30 font-black italic text-xl">{i+1}</span>
-               <input maxLength={30} type="text" placeholder="Add your items..." className={`w-full bg-stone-900 pl-10 pr-4 py-4 rounded-xl font-black uppercase outline-none focus:border-orange-500 border-2 ${localError.includes(v.toUpperCase()) && v !== '' ? 'border-red-500' : 'border-stone-800'} transition-all text-lg`} value={v} onChange={(e) => { const n = [...items]; n[i] = e.target.value; setItems(n); }} />
-            </div>
+            <input key={i} maxLength={30} type="text" placeholder={`ELEMENT ${i+1}`} className="w-full bg-transparent border-b-2 border-zinc-800 p-4 font-mono text-sm uppercase focus:border-cyan-400 outline-none text-cyan-400" value={v} onChange={(e) => { const n = [...items]; n[i] = e.target.value; setItems(n); }} />
           ))}
-          {localError && <div className="p-3 bg-red-600/20 border border-red-500 text-red-500 font-black text-xs uppercase text-center rounded-xl">{localError}</div>}
-          <button onClick={submitPantry} className="w-full bg-orange-600 font-black py-6 rounded-[2rem] text-2xl uppercase shadow-2xl mt-8 active:scale-95 transition-all">Confirm Ingredients</button>
+          {localError && <div className="text-fuchsia-500 font-mono text-[10px] uppercase text-center py-4">{localError}</div>}
+          <button onClick={submitPantry} className="w-full bg-white text-black font-serif italic font-black py-5 text-2xl uppercase mt-8 hover:bg-cyan-400 transition-colors">Submit Assets</button>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 py-20">
-          <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
-          <p className="text-4xl font-black uppercase italic tracking-tighter">Ready!</p>
-          <p className="text-stone-500 font-black uppercase tracking-widest text-xs">Wait for Host to open the kitchen...</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4">
+          <Eye size={64} className="text-fuchsia-500 animate-pulse" />
+          <p className="text-3xl font-serif italic font-black uppercase text-white">AWAITING REVIEW</p>
+          <p className="text-zinc-600 font-mono text-[10px] uppercase tracking-[0.3em]">The curator is preparing the floor.</p>
         </div>
       )}
     </div>
@@ -365,7 +369,7 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
 function IntermissionView({ roomCode, roomData, role, user, appId, requestPermissions }) {
   const isHost = role === 'HOST';
   const isNextChef = roomData.activeChefId === user.uid;
-  const nextChefName = roomData.players[roomData.activeChefId]?.name || "Someone";
+  const nextChefName = roomData.players[roomData.activeChefId]?.name || "ANONYMOUS";
   const lastChefStats = roomData.lastChefStats;
   const countdownInterval = useRef(null);
 
@@ -399,50 +403,43 @@ function IntermissionView({ roomCode, roomData, role, user, appId, requestPermis
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center max-w-[1200px] mx-auto w-full">
-      <div className="w-full mb-8">
-        <p className="text-[10px] font-black text-stone-600 uppercase mb-4 tracking-[0.4em]">Leaderboard Standings</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-           {Object.values(roomData.players).sort((a,b) => b.score - a.score).map((p, i) => (
-             <div key={p.id} className={`p-4 rounded-[1.5rem] border-2 transition-all ${i === 0 ? 'bg-orange-600/10 border-orange-500 shadow-xl' : 'bg-stone-900/50 border-stone-800'}`}>
-                <p className={`text-[10px] font-black italic mb-1 ${i === 0 ? 'text-orange-500' : 'text-stone-600'}`}>#{i+1}</p>
-                <p className="text-lg font-black uppercase truncate tracking-tighter">{p.name}</p>
-                <p className="text-2xl font-black text-white mt-1">{p.score}</p>
-             </div>
-           ))}
-        </div>
+    <div className="min-h-screen flex flex-col bg-[#0a0a0a] p-12">
+      <div className="flex justify-between items-start mb-20">
+         <div className="border-t-4 border-white pt-4">
+            <p className="font-mono text-[10px] text-fuchsia-500 uppercase tracking-widest">Global Rankings</p>
+            <div className="mt-4 space-y-1">
+                {Object.values(roomData.players).sort((a,b) => b.score - a.score).slice(0, 3).map((p, i) => (
+                    <p key={p.id} className="text-xl font-serif italic text-white uppercase"><span className="text-zinc-700 font-mono mr-2">{i+1}.</span> {p.name} — {p.score}</p>
+                ))}
+            </div>
+         </div>
+         <div className="text-right">
+            <p className="text-5xl font-mono text-cyan-400 font-black">№ {roomData.currentRound}/3</p>
+            <p className="font-mono text-[8px] text-zinc-600 uppercase tracking-widest mt-1">Operational Shift</p>
+         </div>
       </div>
 
-      <div className="flex flex-col items-center animate-in zoom-in duration-700">
+      <div className="flex-1 flex flex-col items-center justify-center relative">
         {lastChefStats && (
-          <div className="mb-6 bg-white/5 p-5 rounded-[2rem] border border-white/10 backdrop-blur-md">
-             <p className="text-orange-500 font-black uppercase text-[10px] mb-1 tracking-widest">Previous Shift</p>
-             <h3 className="text-2xl font-black italic uppercase text-white">{lastChefStats.name} prepped {lastChefStats.count} orders!</h3>
+          <div className="absolute top-0 rotate-[-4deg] bg-white text-black px-6 py-2 font-mono text-xs uppercase shadow-[8px_8px_0px_0px_rgba(255,255,255,0.1)]">
+             {lastChefStats.name} produced {lastChefStats.count} units.
           </div>
         )}
         
-        <div className="bg-orange-600 p-8 rounded-[2.5rem] shadow-xl rotate-3 mb-6 animate-bounce">
-          <ChefHat size={70} className="text-white" />
-        </div>
+        <p className="text-fuchsia-500 font-mono text-xs uppercase tracking-[1em] mb-4">Upcoming Feature:</p>
+        <h2 className="text-[12rem] md:text-[15rem] font-serif italic font-black uppercase text-white leading-none tracking-tighter mix-blend-difference">{nextChefName}</h2>
         
-        <p className="text-stone-500 font-black uppercase text-xl mb-2 tracking-[0.2em]">Next Head Chef:</p>
-        <h2 className="text-6xl md:text-8xl font-black uppercase italic text-white leading-none tracking-tighter break-words px-8">{nextChefName}</h2>
-        
-        {roomData.isChefReady ? (
-          <div className="mt-10 w-24 h-24 rounded-full border-[6px] border-stone-800 flex items-center justify-center bg-stone-900 shadow-inner">
-             <span className="text-5xl font-black text-orange-500 tabular-nums animate-pulse">{roomData.intermissionTimer || 5}</span>
-          </div>
-        ) : (
-          <div className="mt-10">
-            {isNextChef ? (
-              <button onClick={handleChefReady} className="px-12 py-5 bg-white text-black font-black text-2xl rounded-full shadow-2xl flex items-center gap-4 hover:scale-105 active:scale-95 transition-all uppercase">
-                I'm Ready! <Play fill="currentColor" />
-              </button>
+        <div className="mt-12">
+            {roomData.isChefReady ? (
+               <div className="text-9xl font-mono font-black text-cyan-400 tabular-nums animate-ping">{roomData.intermissionTimer || 5}</div>
             ) : (
-              <p className="text-stone-600 font-black uppercase italic tracking-widest text-sm animate-pulse">Wait for {nextChefName} to prepare...</p>
+                isNextChef ? (
+                    <button onClick={handleChefReady} className="bg-white text-black font-serif italic font-black text-4xl px-16 py-6 uppercase hover:bg-fuchsia-500 hover:text-white transition-all shadow-[10px_10px_0px_0px_rgba(255,255,255,0.2)]">I Accept</button>
+                ) : (
+                    <p className="font-mono text-xs text-zinc-500 uppercase tracking-widest animate-pulse italic">— Preparing Salon —</p>
+                )
             )}
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -452,7 +449,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   const [timeLeft, setTimeLeft] = useState(ROUND_TIME);
   const [pantryShuffle, setPantryShuffle] = useState([]);
   const [sabProgress, setSabProgress] = useState(0); 
-  const [dialRotation, setDialRotation] = useState(0); // For manual oven dial
+  const [dialRotation, setDialRotation] = useState(0);
   const isChef = roomData.activeChefId === user.uid;
   const isHost = role === 'HOST';
   const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
@@ -460,7 +457,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   const timerInterval = useRef(null);
   const motionRef = useRef({ lastX: 0, lastY: 0, lastZ: 0 });
 
-  // --- 1. Sabotage Suite ---
   const triggerSabotage = async (tid) => {
     if (!tid) return;
     const types = ['SCRUB', 'DIAL', 'SCRATCH'];
@@ -478,7 +474,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     setDialRotation(0);
   };
 
-  // Sensor Logic for Shaking
   useEffect(() => {
     const sab = roomData.sabotages?.[user.uid];
     if (sab?.type === 'SCRUB') {
@@ -493,7 +488,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     }
   }, [roomData.sabotages?.[user.uid]]);
 
-  // --- 2. Timer & Shift Logic (Host Only) ---
   useEffect(() => {
     if (isHost && roomData.activeChefId && roomData.timer === 0) startTurn();
     return () => clearInterval(timerInterval.current);
@@ -529,7 +523,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     } else await updateDoc(roomRef, { status: 'INTERMISSION', currentChefIndex: nextIdx, activeChefId: roomData.turnOrder[nextIdx], timer: 0, lastChefStats: stats, isChefReady: false, intermissionTimer: 0 });
   };
 
-  // --- 3. UI Shuffling on SUCCESS ONLY ---
   useEffect(() => {
     if (!isHost && roomData.status === 'PLAYING') {
       setPantryShuffle([...roomData.pantry].sort(() => Math.random() - 0.5));
@@ -560,175 +553,146 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     }
   };
 
-  // Sabotage Renderers
-  const renderSabotage = () => {
-    const sab = roomData.sabotages[user.uid];
-    if (sab.type === 'SCRATCH') return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center" onPointerMove={(e) => { setSabProgress(p => { if (p >= 100) { finishSab(); return 100; } return p + 0.8; }); }}>
-        <Eraser size={100} className="text-blue-400 mb-8 animate-pulse" />
-        <h2 className="text-5xl font-black uppercase italic text-white mb-4">DIRTY PLATE!</h2>
-        <p className="text-xl font-bold text-blue-200 mb-10">SCRATCH AWAY THE GRIME WITH YOUR FINGER!</p>
-        <div className="relative w-64 h-64 rounded-full border-8 border-white/20 bg-stone-800 flex items-center justify-center overflow-hidden">
-           <div className="absolute inset-0 bg-stone-600 transition-opacity duration-300" style={{ opacity: Math.max(0, (100 - sabProgress) / 100) }}></div>
-           <Utensils size={80} className="text-white opacity-20" />
-        </div>
-      </div>
-    );
-    if (sab.type === 'DIAL') return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center" onPointerMove={(e) => { 
-          const rect = e.currentTarget.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
-          const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
-          const normalized = (angle + 180) % 360; // 0-360
-          setDialRotation(normalized);
-          const currentTemp = Math.floor(normalized + 100);
-          if (Math.abs(currentTemp - sab.targetValue) < 10) finishSab();
-      }}>
-        <Thermometer size={100} className="text-orange-400 mb-8 animate-pulse" />
-        <h2 className="text-5xl font-black uppercase italic text-white mb-4">SET THE OVEN!</h2>
-        <p className="text-xl font-bold text-orange-200 mb-6 uppercase">Target: {sab.targetValue}°F</p>
-        <div className="w-64 h-64 rounded-full border-8 border-orange-500/50 bg-stone-900 flex items-center justify-center relative shadow-inner" style={{ transform: `rotate(${dialRotation}deg)` }}>
-           <div className="w-2 h-16 bg-white rounded-full absolute top-4 shadow-lg"></div>
-           <div className="text-white font-black text-2xl rotate-[-{dialRotation}deg]">{Math.floor(dialRotation + 100)}°</div>
-        </div>
-        <p className="mt-8 text-stone-500 font-bold uppercase text-xs">Drag around the dial with your finger</p>
-      </div>
-    );
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-10">
-        <Waves size={150} className="text-blue-400 animate-pulse" />
-        <h2 className="text-7xl font-black uppercase italic text-white">SCRUB!</h2>
-        <p className="text-xl font-bold text-blue-200 uppercase tracking-widest">SHAKE VIGOROUSLY!</p>
-        <div className="w-full max-w-md bg-blue-950 h-10 rounded-full border-4 border-white/20 overflow-hidden shadow-2xl relative"><div className="bg-white h-full transition-all duration-100 shadow-[0_0_20px_white]" style={{ width: `${sabProgress}%` }}></div></div>
-      </div>
-    );
-  };
-
   if (isHost) {
-    const isHeatOn = timeLeft < 15;
     return (
-      <div className={`flex flex-col h-screen p-8 gap-8 transition-colors duration-1000 max-w-[1200px] mx-auto w-full ${isHeatOn ? 'bg-orange-950/20' : ''}`}>
-        <div className="flex justify-between items-center bg-stone-900 border-4 border-stone-800 p-8 rounded-[3rem] shadow-2xl relative overflow-hidden">
-           {isHeatOn && <div className="absolute inset-0 bg-red-600/20 animate-pulse pointer-events-none"></div>}
-           <div className="flex items-center gap-6 relative">
-              <div className={`p-6 rounded-[1.5rem] shadow-xl ${roomData.isGoldenOrder ? 'bg-yellow-500 animate-pulse' : 'bg-orange-600'}`}><ChefHat className="text-white" size={48} /></div>
-              <div><p className="text-orange-500 font-black uppercase text-xs tracking-[0.3em]">Shift {roomData.currentRound}</p><h2 className="text-5xl font-black uppercase italic tracking-tighter leading-none">{roomData.players[roomData.activeChefId]?.name}</h2></div>
+      <div className="flex flex-col h-screen bg-black p-12 overflow-hidden">
+        {/* Editorial Top Bar */}
+        <div className="flex justify-between items-start border-b-2 border-zinc-800 pb-12 mb-12">
+           <div className="flex items-end gap-6">
+              <div className="text-9xl font-mono font-black text-white leading-none tracking-tighter">{timeLeft}</div>
+              <div className="pb-2">
+                 <p className="font-mono text-[10px] text-fuchsia-500 uppercase tracking-[0.5em]">Seconds Remaining</p>
+                 <h2 className="text-4xl font-serif italic font-black text-zinc-400 uppercase leading-none">{roomData.players[roomData.activeChefId]?.name}</h2>
+              </div>
            </div>
-           <div className={`p-6 rounded-[2rem] border-4 transition-all duration-300 ${timeLeft < 10 ? 'border-red-600 text-red-500 animate-pulse scale-105' : 'border-stone-800 bg-stone-950 text-white'}`}><span className="text-8xl font-black font-mono tabular-nums leading-none">{timeLeft}</span></div>
+           <div className="text-right">
+              <p className="text-fuchsia-500 font-mono text-[10px] uppercase tracking-widest mb-2">Now Serving</p>
+              <h3 className="text-6xl font-serif italic font-black text-white uppercase leading-none">“{roomData.dishName}”</h3>
+           </div>
         </div>
-        <div className="flex-1 grid grid-cols-12 gap-8">
-          <div className="col-span-8 bg-stone-900/40 rounded-[4rem] border-4 border-stone-900 p-12 flex flex-col items-center justify-center relative shadow-inner overflow-hidden">
-             {roomData.isGoldenOrder && <div className="absolute top-8 right-8 bg-yellow-500 text-black px-6 py-2 rounded-full font-black uppercase italic animate-bounce shadow-xl flex items-center gap-2 text-lg"><Zap size={20} fill="currentColor" /> Golden Order (2X)</div>}
-             <p className="text-stone-600 font-black uppercase tracking-[0.4em] mb-6 text-sm">Now Cooking:</p>
-             <h3 className="text-6xl font-black italic text-center mb-16 uppercase leading-none tracking-tighter drop-shadow-2xl">"{roomData.dishName}"</h3>
-             <div className="w-full max-w-2xl bg-stone-950 h-32 rounded-full border-4 border-stone-800 flex items-center px-6 gap-3 shadow-2xl relative">
-                {roomData.completedIngredients.map((_, i) => <div key={i} className="flex-1 bg-orange-600 h-20 rounded-full flex items-center justify-center animate-in zoom-in border-b-4 border-orange-800 shadow-xl"><CheckCircle2 className="text-white" size={32} /></div>)}
-                {Array.from({ length: Math.max(0, 5 - roomData.completedIngredients.length) }).map((_, i) => <div key={i} className="flex-1 h-20 rounded-full border-2 border-stone-800 border-dashed opacity-20"></div>)}
-             </div>
-          </div>
-          <div className="col-span-4 flex flex-col gap-8">
-            <div className="bg-stone-900 p-8 rounded-[3rem] border-2 border-stone-800 shadow-xl overflow-hidden relative">
-              <h4 className="font-black uppercase text-red-500 mb-6 flex items-center gap-4 tracking-tighter text-2xl"><Skull size={32} /> Sabotage</h4>
-              <div className="space-y-4">
-                {Object.entries(roomData.sabotages || {}).map(([sid, sab]) => sab && (
-                  <div key={sid} className="flex items-center gap-4 animate-bounce"><Waves className="text-blue-500" size={32} /><p className="font-black text-2xl uppercase italic text-blue-400 truncate">{roomData.players[sid]?.name} IS REELING!</p></div>
-                ))}
-                {Object.values(roomData.sabotages || {}).every(s => !s) && <p className="text-stone-800 font-black uppercase italic py-8 text-center tracking-widest text-xl opacity-30">Pantry is Quiet...</p>}
-              </div>
+
+        <div className="flex-1 grid grid-cols-12 gap-12">
+            {/* Main Stage */}
+            <div className="col-span-8 border-4 border-zinc-800 flex flex-col items-center justify-center relative overflow-hidden bg-[radial-gradient(circle_at_50%_120%,_#111_0%,_#000_100%)]">
+                {roomData.isGoldenOrder && <div className="absolute top-12 left-12 bg-fuchsia-500 text-white font-mono font-black px-6 py-2 uppercase tracking-widest animate-pulse">Exclusive Order (2X)</div>}
+                
+                <div className="flex gap-4 mb-20">
+                    {roomData.completedIngredients.map((_, i) => <div key={i} className="w-16 h-32 bg-cyan-400 border-2 border-black shadow-[4px_4px_0px_0px_rgba(255,255,255,0.1)]"></div>)}
+                    {Array.from({ length: Math.max(0, 5 - roomData.completedIngredients.length) }).map((_, i) => <div key={i} className="w-16 h-32 border-2 border-zinc-800 border-dashed"></div>)}
+                </div>
+                
+                <div className="text-[10rem] font-serif italic font-black text-white/5 absolute -bottom-10 whitespace-nowrap select-none">EDITORIAL COLLECTION</div>
             </div>
-            <div className="flex-1 bg-stone-900 p-8 rounded-[3rem] border-2 border-stone-800 shadow-xl overflow-y-auto">
-              <h4 className="font-black uppercase text-stone-600 mb-6 text-sm tracking-widest">Standings</h4>
-              <div className="space-y-3">
-                {Object.values(roomData.players).sort((a,b) => b.score - a.score).map((p, i) => (
-                  <div key={p.id} className={`flex justify-between items-center p-4 rounded-[1.5rem] transition-all border-2 ${i === 0 ? 'bg-orange-600 border-orange-400 shadow-xl' : 'bg-stone-950 border-stone-900'}`}><div className="flex items-center gap-4"><span className={`text-xl font-black italic ${i === 0 ? 'text-white' : 'text-stone-700'}`}>{i+1}</span><span className={`text-xl font-black uppercase truncate max-w-[120px] ${i === 0 ? 'text-white' : ''}`}>{p.name}</span></div><span className={`text-2xl font-black ${i === 0 ? 'text-white' : 'text-orange-500'}`}>{p.score}</span></div>
-                ))}
-              </div>
+
+            {/* Sidebar Stats */}
+            <div className="col-span-4 space-y-8">
+                <div className="border-t-4 border-fuchsia-500 pt-4">
+                    <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-6">Salon Standings</p>
+                    <div className="space-y-4">
+                        {Object.values(roomData.players).sort((a,b) => b.score - a.score).map((p, i) => (
+                            <div key={p.id} className="flex justify-between items-end border-b border-zinc-900 pb-2">
+                                <p className="text-2xl font-serif italic font-black text-white uppercase">{p.name}</p>
+                                <p className="text-2xl font-mono text-cyan-400">{p.score}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {Object.values(roomData.sabotages || {}).some(s => s) && (
+                   <div className="bg-fuchsia-600 p-6 text-white animate-bounce">
+                      <Skull size={32} className="mb-2" />
+                      <p className="font-serif italic font-black text-2xl uppercase">SABOTAGE IN PROGRESS</p>
+                   </div>
+                )}
             </div>
-          </div>
         </div>
       </div>
     );
   }
 
   if (isChef) {
-    // SAFE CONSTRAINTS LOOKUP
     const roundConstraints = [
-      { title: "THE TRAINING SHIFT", text: "SAY ANYTHING!", text2: "Avoid words on the card", icon: <RefreshCcw /> },
-      { title: "THE LUNCH RUSH", text: "ONE WORD ONLY!", text2: "One single word per item", icon: <Zap /> },
-      { title: "KITCHEN NIGHTMARE", text: "SILENT CHARADES!", text2: "No talking. No noise.", icon: <Skull /> }
+      { title: "FREE EXPRESSION", text: "UNLIMITED", icon: <RefreshCcw /> },
+      { title: "THE MONOLOGUE", text: "ONE WORD", icon: <Zap /> },
+      { title: "THE MIME", text: "SILENCE", icon: <Skull /> }
     ];
     const currentRoundIndex = Math.max(0, Math.min(roomData.currentRound - 1, 2));
     const constraint = roundConstraints[currentRoundIndex];
 
     return (
-      <div className="min-h-screen p-8 flex flex-col items-center justify-center bg-stone-950 text-center">
-          <div className="mb-10">
-            <div className="bg-orange-600 w-24 h-24 mx-auto rounded-[2rem] flex items-center justify-center mb-6 shadow-2xl animate-bounce"><ChefHat size={48} className="text-white" /></div>
-            <p className="text-orange-500 font-black uppercase text-xs tracking-[0.3em]">{constraint.title}</p>
-            <h2 className="text-4xl font-black uppercase italic mt-2">{constraint.text}</h2>
-            <p className="text-stone-500 font-bold uppercase text-[10px] mt-2">{constraint.text2}</p>
-          </div>
-          <div className="bg-white text-black p-12 rounded-[4rem] w-full max-w-md shadow-2xl border-b-[16px] border-stone-300 relative overflow-hidden">
-             {roomData.isGoldenOrder && <div className="absolute top-0 left-0 w-full h-4 bg-yellow-500"></div>}
-             <p className="text-xs font-black uppercase tracking-widest text-stone-400 mb-2">The Ingredient:</p>
-             <h2 className="text-6xl font-black uppercase italic leading-none tracking-tighter break-words">{roomData.currentIngredient}</h2>
-          </div>
-          <div className="mt-12 grid grid-cols-2 gap-6 w-full max-w-md">
-             <div className="bg-stone-900 p-8 rounded-[3rem] border-4 border-stone-800"><p className="text-xs font-black text-stone-600 uppercase mb-1">Prepped</p><p className="text-6xl font-black text-orange-500">{roomData.chefSuccessCount}</p></div>
-             <div className="bg-stone-900 p-8 rounded-[3rem] border-4 border-stone-800"><p className="text-xs font-black text-stone-600 uppercase mb-1">Time</p><p className={`text-6xl font-black ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>{timeLeft}</p></div>
-          </div>
-          {roomData.currentRound > 1 && <button onClick={() => { if(window.confirm('Skip?')) skipIngredient(); }} className="mt-10 bg-red-600/10 text-red-500 px-10 py-5 rounded-full font-black uppercase tracking-[0.4em] text-xs hover:bg-red-600 hover:text-white transition-all">Skip Order (-100)</button>}
+      <div className="min-h-screen p-8 flex flex-col items-center justify-between bg-[#0a0a0a]">
+        <div className="w-full border-t-2 border-fuchsia-500 pt-4">
+            <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">{constraint.title}</p>
+            <h2 className="text-3xl font-serif italic font-black text-white uppercase">{constraint.text}</h2>
+        </div>
+
+        <div className="w-full max-w-sm bg-white p-12 text-black shadow-[15px_15px_0px_0px_#22d3ee]">
+            <p className="font-mono text-[8px] uppercase tracking-widest mb-4 opacity-40">Ingredient Specification</p>
+            <h2 className="text-6xl font-serif italic font-black uppercase leading-none tracking-tighter break-words">{roomData.currentIngredient}</h2>
+        </div>
+
+        <div className="w-full grid grid-cols-2 gap-2">
+            <div className="border border-zinc-800 p-6">
+                <p className="font-mono text-[8px] text-zinc-600 uppercase mb-2">Production</p>
+                <p className="text-5xl font-mono font-black text-fuchsia-500">{roomData.chefSuccessCount}</p>
+            </div>
+            <div className="border border-zinc-800 p-6">
+                <p className="font-mono text-[8px] text-zinc-600 uppercase mb-2">Shift Timer</p>
+                <p className="text-5xl font-mono font-black text-white">{timeLeft}</p>
+            </div>
+        </div>
       </div>
     );
   }
 
-  const activeSab = roomData.sabotages?.[user.uid];
-  const isLockedOut = roomData.players?.[user.uid]?.isLockedOut;
+  // --- Sabotage Overlays (Stylized) ---
+  if (roomData.sabotages?.[user.uid]) {
+    const sab = roomData.sabotages[user.uid];
+    return (
+        <div className="min-h-screen bg-fuchsia-600 flex flex-col items-center justify-center p-12 text-center text-white">
+            <Skull size={120} className="mb-8" />
+            <h2 className="text-7xl font-serif italic font-black uppercase leading-none mb-4">CRITICAL <br/>FAULT</h2>
+            <p className="font-mono text-sm uppercase tracking-widest mb-12">Correct the hardware immediately.</p>
+            {sab.type === 'SCRUB' && <div className="w-full h-4 bg-black/20 rounded-full overflow-hidden"><div className="h-full bg-white transition-all duration-100" style={{ width: `${sabProgress}%` }}></div></div>}
+            <p className="mt-8 font-mono text-[10px] uppercase animate-pulse">Interaction Required</p>
+        </div>
+    );
+  }
 
-  // --- Intense 86'ed Lockout View ---
-  if (isLockedOut) return (
-    <div className="min-h-screen bg-red-600 flex flex-col items-center justify-center p-12 text-center animate-in zoom-in duration-300 z-[200] relative">
-      <div className="bg-white p-12 rounded-[3rem] mb-12 transform -rotate-12 shadow-2xl border-b-[16px] border-stone-200 relative z-10">
-        <Skull size={180} className="text-red-600" />
-      </div>
-      <h2 className="text-[6rem] md:text-[8rem] font-black uppercase italic text-white mb-6 leading-none tracking-tighter drop-shadow-2xl relative z-10">86'ED!</h2>
-      <div className="bg-black/30 p-10 rounded-[2.5rem] border-4 border-white/30 backdrop-blur-xl relative z-10 max-w-md w-full">
-        <p className="text-white font-black uppercase text-2xl tracking-[0.3em] leading-relaxed">OUT OF THE KITCHEN!</p>
-        <p className="text-red-200 font-bold uppercase text-xs mt-4 opacity-70">Wait for the next order to deal...</p>
-      </div>
+  if (roomData.players?.[user.uid]?.isLockedOut) return (
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-12 text-center">
+        <h2 className="text-[10rem] font-serif italic font-black text-white/10 uppercase leading-none absolute">86'ED</h2>
+        <div className="z-10 bg-white p-12 text-black shadow-[20px_20px_0px_0px_#f0f]">
+            <h3 className="text-5xl font-serif italic font-black uppercase mb-4">EXPELLED</h3>
+            <p className="font-mono text-[10px] uppercase tracking-widest">Inaccurate data detected. Access suspended until next cycle.</p>
+        </div>
     </div>
   );
 
   return (
-    <div className={`h-screen flex flex-col ${activeSab ? 'bg-blue-900' : 'bg-stone-950'}`}>
-      {activeSab ? renderSabotage() : (
-        <>
-          <div className="p-6 bg-stone-900 border-b-4 border-stone-800 flex justify-between items-center shadow-2xl">
-             <div><p className="text-[10px] font-black uppercase text-stone-500 tracking-widest">Wallet</p><p className="text-4xl font-black text-orange-500 tabular-nums">{roomData.players?.[user.uid]?.score || 0}</p></div>
-             <div className="text-right">
-                <p className="text-[10px] font-black uppercase text-stone-500 tracking-widest">Charges</p>
-                <div className="flex gap-1 justify-end">{Array.from({ length: 3 }).map((_, i) => <Zap key={i} size={24} className={i < (roomData.players?.[user.uid]?.sabotageCharges || 0) ? 'text-blue-500 fill-blue-500' : 'text-stone-700'} />)}</div>
-             </div>
+    <div className="h-screen flex flex-col bg-zinc-950">
+      <div className="p-6 border-b border-zinc-900 flex justify-between items-center bg-black">
+          <p className="text-4xl font-mono font-black text-cyan-400">{roomData.players?.[user.uid]?.score || 0}</p>
+          <div className="flex gap-1">{Array.from({ length: 3 }).map((_, i) => <div key={i} className={`w-3 h-8 ${i < (roomData.players?.[user.uid]?.sabotageCharges || 0) ? 'bg-fuchsia-500 shadow-[0_0_10px_#f0f]' : 'bg-zinc-800'}`}></div>)}</div>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="border-2 border-zinc-800 p-4">
+              <p className="font-mono text-[8px] text-zinc-600 uppercase tracking-widest mb-4">Disturb Rival Collection:</p>
+              <select className="w-full bg-zinc-900 text-white p-4 font-mono text-sm uppercase outline-none border-b-4 border-fuchsia-500" onChange={(e) => { triggerSabotage(e.target.value); e.target.value = ''; }} disabled={(roomData.players?.[user.uid]?.sabotageCharges || 0) <= 0}>
+                  <option value="">-- SELECT TARGET --</option>
+                  {Object.values(roomData.players).filter(p => p.id !== user.uid && p.id !== roomData.activeChefId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
           </div>
-          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-stone-950">
-             <div className="p-6 bg-blue-950/40 rounded-[2.5rem] border-2 border-blue-900/50 shadow-inner">
-                <div className="flex items-center gap-3 mb-4"><Skull className="text-blue-400" size={24} /><p className="text-xs font-black uppercase text-blue-400 tracking-[0.4em]">Sabotage a Rival:</p></div>
-                <div className="relative">
-                  <select className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black uppercase text-xl outline-none border-b-[10px] border-blue-800 active:translate-y-1 transition-all appearance-none" onChange={(e) => { triggerSabotage(e.target.value); e.target.value = ''; }} disabled={(roomData.players?.[user.uid]?.sabotageCharges || 0) <= 0}>
-                     <option value="">-- PICK VICTIM --</option>
-                     {Object.values(roomData.players).filter(p => p.id !== user.uid && p.id !== roomData.activeChefId).map(p => <option key={p.id} value={p.id} disabled={roomData.sabotages?.[p.id]}>{p.name}</option>)}
-                  </select>
-                  <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none"><HandMetal size={32}/></div>
-                </div>
-             </div>
-             <div className="space-y-3 pb-32">
-                <p className="text-[10px] font-black uppercase text-stone-700 tracking-[0.6em] text-center my-6">Select Ingredient</p>
-               {pantryShuffle.map((ing, idx) => <button key={idx} onClick={() => handleGuess(ing)} className="w-full bg-stone-900 border-b-[10px] border-stone-800 p-6 rounded-[2.5rem] text-left font-black uppercase text-xl text-white active:bg-orange-600 active:border-orange-800 active:translate-y-1 shadow-xl transition-all">{ing}</button>)}
-             </div>
+          
+          <div className="grid grid-cols-1 gap-1 pb-24">
+             {pantryShuffle.map((ing, idx) => (
+                 <button key={idx} onClick={() => handleGuess(ing)} className="w-full bg-white text-black p-6 font-serif italic font-black uppercase text-2xl text-left hover:bg-cyan-400 transition-all border-b-4 border-zinc-300">
+                    {ing}
+                 </button>
+             ))}
           </div>
-        </>
-      )}
+      </div>
     </div>
   );
 }
@@ -745,34 +709,23 @@ function ResultsView({ roomData, roomCode, role, appId }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 p-4 text-center overflow-y-auto">
-        <div className="flex flex-col items-center mb-8 mt-4 animate-in zoom-in duration-500">
-          <Trophy size={60} className="text-orange-500 mb-4 md:w-24 md:h-24" />
-          <h1 className="text-5xl md:text-8xl font-black italic uppercase text-white leading-none tracking-tighter drop-shadow-2xl">THE VERDICT</h1>
-        </div>
+    <div className="min-h-screen flex flex-col items-center bg-zinc-50 p-12 text-black">
+        <h1 className="text-[12rem] md:text-[18rem] font-serif italic font-black uppercase leading-[0.75] tracking-tighter text-black mb-12">THE <br/>FINALE</h1>
         
-        <div className="w-full max-w-2xl space-y-3 mb-8">
+        <div className="w-full max-w-3xl space-y-0 border-t-4 border-black mb-12">
           {players.map((p, i) => (
-            <div key={p.id} className={`p-4 md:p-8 rounded-[2rem] border-2 md:border-4 flex justify-between items-center transition-all ${i === 0 ? 'bg-white text-black border-orange-500 scale-105 shadow-2xl' : 'bg-stone-900/50 border-stone-800'}`}>
-               <div className="flex items-center gap-4 md:gap-8">
-                 <span className={`text-3xl md:text-6xl font-black italic ${i === 0 ? 'text-orange-500' : 'opacity-20'}`}>#{i+1}</span>
-                 <p className="text-xl md:text-4xl font-black uppercase italic tracking-tighter truncate max-w-[150px] md:max-w-none">{p.name}</p>
-               </div>
-               <p className={`text-2xl md:text-5xl font-black ${i === 0 ? 'text-orange-600' : 'text-stone-500'}`}>{p.score} <span className="text-[10px] md:text-sm">PTS</span></p>
+            <div key={p.id} className="flex justify-between items-center py-6 border-b-2 border-black/10">
+                <div className="flex items-end gap-6">
+                    <span className="text-6xl font-mono font-black text-fuchsia-500">0{i+1}</span>
+                    <p className="text-5xl font-serif italic font-black uppercase leading-none">{p.name}</p>
+                </div>
+                <p className="text-5xl font-mono font-black">{p.score}</p>
             </div>
           ))}
         </div>
         
         {isHost && (
-          <button onClick={reset} className="mt-4 bg-orange-600 hover:bg-orange-500 text-white px-10 py-5 rounded-[2.5rem] text-xl md:text-4xl font-black uppercase active:scale-95 shadow-xl transition-all border-b-8 border-orange-800 mb-10">
-            Re-Open Kitchen
-          </button>
-        )}
-        
-        {!isHost && (
-          <div className="bg-stone-900 p-6 rounded-3xl border border-stone-800 mb-10">
-            <p className="text-stone-500 font-black uppercase tracking-widest text-xs">Waiting for Head Chef to re-open...</p>
-          </div>
+          <button onClick={reset} className="bg-black text-white px-20 py-8 font-serif italic font-black text-5xl uppercase shadow-[15px_15px_0px_0px_#22d3ee] hover:bg-fuchsia-600 transition-all">Curate Again</button>
         )}
     </div>
   );
