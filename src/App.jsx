@@ -119,7 +119,6 @@ export default function App() {
   
   const introAudio = useRef(null);
 
-  // Initialize Background Music
   useEffect(() => {
     introAudio.current = new Audio('intro.mp3');
     introAudio.current.loop = true;
@@ -133,7 +132,6 @@ export default function App() {
     };
   }, []);
 
-  // Handle Volume Ducking based on game status
   useEffect(() => {
     if (introAudio.current && roomData) {
       const targetVolume = roomData.status === 'PLAYING' ? 0.15 : 0.6;
@@ -141,7 +139,6 @@ export default function App() {
     }
   }, [roomData?.status, isMuted]);
 
-  // If Firebase is not configured properly, show a helpful error screen
   if (!isConfigValid) {
     return (
       <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-8 text-center bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950">
@@ -236,11 +233,10 @@ export default function App() {
       setRole('HOST');
       setActiveRoomCode(newCode);
       setView('LOBBY');
-      // Start Music
       if (introAudio.current) {
-        introAudio.current.play().catch(e => console.log("Audio play blocked by browser. Interaction required."));
+        introAudio.current.play().catch(e => console.log("Audio play blocked"));
       }
-    } catch (e) { setError("Failed to create room. Check Firebase permissions."); }
+    } catch (e) { setError("Failed to create room."); }
   };
 
   const joinRoom = async () => {
@@ -274,7 +270,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-orange-500 overflow-hidden">
-      {/* Audio Controls for Host */}
       {role === 'HOST' && view !== 'LANDING' && view !== 'RESULTS' && (
         <div className="fixed bottom-6 right-6 z-50 flex gap-3">
           <button 
@@ -333,14 +328,12 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
     }
     const cleanItems = items.map(i => i.trim().toUpperCase());
     
-    // Check for duplicates in current submission
     const uniqueSubmission = new Set(cleanItems);
     if (uniqueSubmission.size !== cleanItems.length) {
       setLocalError("Submission contains duplicates!");
       return;
     }
 
-    // Check against global pantry
     const existingPantry = roomData.pantry || [];
     const duplicate = cleanItems.find(item => existingPantry.includes(item));
     if (duplicate) {
@@ -411,7 +404,7 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
           {items.map((v, i) => (
             <div key={i} className="relative">
                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500/30 font-black italic text-xl">{i+1}</span>
-               <input maxLength={30} type="text" placeholder="Add an item..." className={`w-full bg-stone-900 pl-10 pr-4 py-4 rounded-xl font-black uppercase outline-none focus:border-orange-500 border-2 ${localError.includes(v.toUpperCase()) && v !== '' ? 'border-red-500 animate-shake' : 'border-stone-800'} transition-all text-lg`} value={v} onChange={(e) => { const n = [...items]; n[i] = e.target.value; setItems(n); }} />
+               <input maxLength={30} type="text" placeholder="Add an item..." className={`w-full bg-stone-900 pl-10 pr-4 py-4 rounded-xl font-black uppercase outline-none focus:border-orange-500 border-2 ${localError.includes(v.toUpperCase()) && v !== '' ? 'border-red-500 animate-pulse' : 'border-stone-800'} transition-all text-lg`} value={v} onChange={(e) => { const n = [...items]; n[i] = e.target.value; setItems(n); }} />
             </div>
           ))}
           {localError && <div className="p-3 bg-red-600/20 border border-red-500 text-red-500 font-black text-xs uppercase text-center rounded-xl">{localError}</div>}
@@ -460,7 +453,6 @@ function IntermissionView({ roomCode, roomData, role, user, appId, requestPermis
     if (isHost) startCountdown(); 
   };
 
-  // Sync for host to trigger countdown automatically once chef is ready
   useEffect(() => {
     if (isHost && roomData.isChefReady && roomData.intermissionTimer === 0) {
       startCountdown();
@@ -522,21 +514,17 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   const isHost = role === 'HOST';
   const roomRef = db ? doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode) : null;
   const timerInterval = useRef(null);
-  const motionRef = useRef({ lastX: 0, lastY: 0, lastZ: 0 });
+  const motionRef = useRef({ lastX: 0, lastY: 0 });
 
   const currentRule = ROUND_RULES[roomData.currentRound - 1] || ROUND_RULES[0];
 
-  // --- 1. Sabotage Suite ---
   const triggerSabotage = async (tid) => {
     if (!tid || !roomRef) return;
-    const types = ['DRY', 'SCRUB', 'DIAL'];
+    const types = ['DRY', 'DICE', 'DIAL'];
     const type = types[Math.floor(Math.random() * types.length)];
+    const targetValue = type === 'DIAL' ? Math.floor(Math.random() * 300 + 100) : (type === 'DICE' ? 12 : 0);
     const updates = {};
-    updates[`sabotages.${tid}`] = { 
-      type, 
-      progress: 0, 
-      targetValue: type === 'DIAL' ? Math.floor(Math.random() * 300 + 100) : 0 
-    };
+    updates[`sabotages.${tid}`] = { type, progress: 0, targetValue };
     updates[`players.${user.uid}.sabotageCharges`] = (roomData.players[user.uid]?.sabotageCharges || 0) - 1;
     await updateDoc(roomRef, updates);
   };
@@ -567,7 +555,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     }
   }, [roomData.sabotages?.[user.uid]]);
 
-  // --- 2. Timer & Round Logic ---
   useEffect(() => {
     if (isHost && roomData.activeChefId && roomData.timer === 0) startTurn();
     return () => clearInterval(timerInterval.current);
@@ -706,53 +693,75 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   const renderSabotage = () => {
     const sab = roomData.sabotages[user.uid];
     
-    if (sab.type === 'SCRUB') return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-blue-900" onPointerMove={(e) => { 
-          if (e.buttons > 0) { 
-            setSabProgress(p => { if (p >= 100) { finishSab(); return 100; } return p + 1.2; }); 
-          }
-      }}>
-        <Eraser size={100} className="text-blue-200 mb-8 animate-pulse" />
-        <h2 className="text-5xl font-black uppercase italic text-white mb-4">SCRUB IT!</h2>
-        <p className="text-xl font-bold text-blue-100 mb-10">SCRUB THE GRIME OFF THE PLATE!</p>
-        <div className="relative w-72 h-72 rounded-full border-8 border-white/40 bg-stone-800 flex items-center justify-center overflow-hidden">
-           <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm transition-opacity" style={{ opacity: (100 - sabProgress) / 100 }}></div>
-           <Utensils size={100} className="text-white opacity-40" />
-           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-full h-8 bg-blue-400/20 absolute rotate-45"></div>
-              <div className="w-full h-8 bg-blue-400/20 absolute -rotate-45"></div>
-           </div>
+    if (sab.type === 'DICE') return (
+      <div 
+        className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-emerald-900 touch-none select-none"
+        onClick={() => {
+          setSabProgress(p => {
+            const next = p + (100 / sab.targetValue);
+            if (next >= 99) { finishSab(); return 100; }
+            return next;
+          });
+        }}
+      >
+        <div className="text-white mb-8 animate-bounce">
+           <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 14.5l7-7M9 7.5L2 14.5M14 17.5l7-7M21 10.5L14 17.5M10.5 22L17.5 15M17.5 15L10.5 22" />
+           </svg>
         </div>
-        <p className="mt-8 text-blue-300 font-bold uppercase text-xs">Swipe back and forth!</p>
+        <h2 className="text-5xl font-black uppercase italic text-white mb-4 leading-none tracking-tighter">DICE THE VEG!</h2>
+        <p className="text-xl font-bold text-emerald-200 mb-10">TAP REPEATEDLY TO CHOP!</p>
+        <div className="w-full max-w-xs h-40 bg-stone-800 rounded-[2.5rem] border-4 border-stone-700 relative overflow-hidden flex items-center justify-center shadow-2xl active:scale-95 transition-transform">
+          <div className="absolute inset-0 flex items-center justify-around opacity-20 pointer-events-none">
+            {Array.from({length: 8}).map((_, i) => <div key={i} className="w-1 h-full bg-white"></div>)}
+          </div>
+          <span className="text-white font-black text-5xl italic relative z-10 animate-pulse">CHOP!</span>
+        </div>
+        <div className="w-full max-w-xs mt-10 bg-black/40 h-10 rounded-full border-2 border-white/20 overflow-hidden shadow-inner">
+          <div className="bg-emerald-400 h-full transition-all duration-75 shadow-[0_0_20px_rgba(52,211,153,0.5)]" style={{ width: `${sabProgress}%` }}></div>
+        </div>
       </div>
     );
 
     if (sab.type === 'DIAL') return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-orange-900" onPointerMove={(e) => { 
-          if (e.buttons > 0) {
+      <div 
+        className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-orange-950 touch-none select-none"
+        onPointerMove={(e) => { 
+          if (e.buttons > 0 || e.pointerType === 'touch') {
             const rect = e.currentTarget.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
-            const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI;
-            const normalized = (angle + 180) % 360; 
-            setDialRotation(normalized);
-            const currentTemp = Math.floor(normalized + 100);
+            const dx = e.clientX - centerX;
+            const dy = e.clientY - centerY;
+            const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            let deg = (angle + 90 + 360) % 360;
+            setDialRotation(deg);
+            const currentTemp = Math.floor(deg + 100);
             if (Math.abs(currentTemp - sab.targetValue) < 8) finishSab();
           }
-      }}>
-        <Thermometer size={100} className="text-orange-200 mb-8 animate-pulse" />
-        <h2 className="text-5xl font-black uppercase italic text-white mb-4">SET OVEN!</h2>
-        <p className="text-xl font-bold text-orange-100 mb-6 uppercase">TARGET: <span className="bg-white text-orange-900 px-4 py-1 rounded-lg">{sab.targetValue}°F</span></p>
-        <div className="w-64 h-64 rounded-full border-[12px] border-stone-800 bg-stone-900 flex items-center justify-center relative shadow-2xl" style={{ transform: `rotate(${dialRotation}deg)` }}>
-           <div className="w-3 h-20 bg-orange-500 rounded-full absolute top-4 shadow-lg border-2 border-white"></div>
-           <div className="text-white font-black text-4xl" style={{ transform: `rotate(${-dialRotation}deg)` }}>{Math.floor(dialRotation + 100)}°</div>
+        }}
+      >
+        <Thermometer size={100} className="text-orange-400 mb-8 animate-pulse" />
+        <h2 className="text-5xl font-black uppercase italic text-white mb-2 leading-none">SET THE OVEN!</h2>
+        <p className="text-xl font-bold text-orange-200 mb-8 uppercase tracking-widest">
+          Target: <span className="bg-white text-orange-950 px-4 py-1 rounded-lg ml-2">{sab.targetValue}°F</span>
+        </p>
+        <div className="w-64 h-64 rounded-full border-[12px] border-stone-700 bg-stone-900 flex items-center justify-center relative shadow-[0_0_50px_rgba(0,0,0,0.5)] active:scale-105 transition-transform">
+           <div 
+             className="absolute inset-0 flex items-center justify-center transition-transform duration-75"
+             style={{ transform: `rotate(${dialRotation}deg)` }}
+           >
+              <div className="w-3 h-24 bg-orange-600 rounded-full absolute -top-1 shadow-lg border-2 border-white"></div>
+           </div>
+           <div className="text-white font-black text-5xl tabular-nums drop-shadow-lg z-10">{Math.floor(dialRotation + 100)}°</div>
+           <div className="absolute inset-4 rounded-full border border-white/5 pointer-events-none"></div>
         </div>
-        <p className="mt-12 text-orange-300 font-bold uppercase text-xs">Twist the dial to the target temp!</p>
+        <p className="mt-12 text-stone-500 font-bold uppercase text-xs tracking-[0.3em]">DRAG THE DIAL WITH YOUR FINGER</p>
       </div>
     );
 
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-10 bg-blue-800">
+      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-10 bg-blue-800 touch-none select-none">
         <Wind size={150} className="text-white animate-pulse" />
         <h2 className="text-7xl font-black uppercase italic text-white">DRY IT!</h2>
         <p className="text-xl font-bold text-blue-100 uppercase tracking-widest">SHAKE YOUR PHONE TO DRY!</p>
@@ -783,8 +792,8 @@ function GameView({ roomCode, roomData, user, role, appId }) {
           <div className="col-span-8 bg-stone-900/40 rounded-[4rem] border-4 border-stone-900 p-12 flex flex-col items-center justify-center relative">
              <div className="flex flex-col items-center gap-4 bg-white/5 p-10 rounded-[3rem] border border-white/10">
                 <p className="text-orange-500 font-black uppercase tracking-[0.5em] text-sm">Rules of the Kitchen:</p>
-                <h4 className="text-4xl font-black italic text-white uppercase">{currentRule.rule}</h4>
-                <p className="text-stone-500 font-bold uppercase text-xs">{currentRule.sub}</p>
+                <h4 className="text-4xl font-black italic text-white uppercase text-center">{currentRule.rule}</h4>
+                <p className="text-stone-500 font-bold uppercase text-xs text-center">{currentRule.sub}</p>
              </div>
 
              <div className="w-full max-w-2xl bg-stone-950 h-32 rounded-full border-4 border-stone-800 flex items-center px-6 gap-3 mt-16 shadow-inner">
@@ -794,7 +803,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
           </div>
 
           <div className="col-span-4 flex flex-col gap-8">
-            <div className="bg-stone-900 p-8 rounded-[3rem] border-2 border-stone-800 shadow-xl">
+            <div className="bg-stone-900 p-8 rounded-[3rem] border-2 border-stone-800 shadow-xl overflow-y-auto">
               <h4 className="font-black uppercase text-red-500 mb-6 flex items-center gap-4 tracking-tighter text-2xl"><Skull size={32} /> Sabotages</h4>
               <div className="space-y-4">
                 {Object.entries(roomData.sabotages || {}).map(([sid, sab]) => sab && (
@@ -852,7 +861,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     );
   }
 
-  // --- Player View ---
   const activeSab = roomData.sabotages?.[user.uid];
   const isLockedOut = roomData.players?.[user.uid]?.isLockedOut;
 
@@ -868,7 +876,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   );
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {activeSab ? renderSabotage() : (
         <>
           <div className="p-6 bg-stone-900 border-b-4 border-stone-800 flex justify-between items-center shadow-2xl">
@@ -909,7 +917,7 @@ function ResultsView({ roomData, roomCode, role, appId }) {
   const reset = async () => {
     if (!db) return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-    const up = { status: 'LOBBY', currentRound: 1, currentChefIndex: 0, pantry: [], deck: [], completedIngredients: [], sabotages: {}, lastChefStats: null, isChefReady: false, intermissionTimer: 0 };
+    const up = { status: 'LOBBY', currentRound: 1, currentChefIndex: 0, pantry: [], deck: [], discard: [], completedIngredients: [], sabotages: {}, lastChefStats: null, isChefReady: false, intermissionTimer: 0 };
     Object.keys(roomData.players).forEach(id => { 
       up[`players.${id}.score`] = 0; 
       up[`players.${id}.ready`] = false; 
@@ -920,15 +928,15 @@ function ResultsView({ roomData, roomCode, role, appId }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 p-4 text-center">
-        <div className="flex flex-col items-center mb-8 mt-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-950 p-4 text-center overflow-y-auto">
+        <div className="flex flex-col items-center mb-8 mt-4 animate-in zoom-in duration-500">
           <Trophy size={80} className="text-orange-500 mb-4" />
-          <h1 className="text-6xl md:text-8xl font-black italic uppercase text-white leading-none tracking-tighter">THE VERDICT</h1>
+          <h1 className="text-6xl md:text-8xl font-black italic uppercase text-white leading-none tracking-tighter drop-shadow-2xl">THE VERDICT</h1>
         </div>
         
         <div className="w-full max-w-2xl space-y-3 mb-8">
           {players.map((p, i) => (
-            <div key={p.id} className={`p-6 rounded-[2rem] border-4 flex justify-between items-center ${i === 0 ? 'bg-white text-black border-orange-500 scale-105' : 'bg-stone-900/50 border-stone-800'}`}>
+            <div key={p.id} className={`p-6 rounded-[2rem] border-4 flex justify-between items-center transition-all ${i === 0 ? 'bg-white text-black border-orange-500 scale-105 shadow-2xl' : 'bg-stone-900/50 border-stone-800'}`}>
                <div className="flex items-center gap-6">
                  <span className={`text-4xl font-black italic ${i === 0 ? 'text-orange-500' : 'opacity-20'}`}>#{i+1}</span>
                  <p className="text-3xl font-black uppercase italic tracking-tighter">{p.name}</p>
@@ -939,7 +947,7 @@ function ResultsView({ roomData, roomCode, role, appId }) {
         </div>
         
         {isHost && (
-          <button onClick={reset} className="mt-4 bg-orange-600 hover:bg-orange-500 text-white px-12 py-6 rounded-[2.5rem] text-3xl font-black uppercase active:scale-95 transition-all border-b-8 border-orange-800">
+          <button onClick={reset} className="mt-4 bg-orange-600 hover:bg-orange-500 text-white px-12 py-6 rounded-[2.5rem] text-3xl font-black uppercase active:scale-95 transition-all border-b-8 border-orange-800 mb-10 shadow-xl">
             Re-Open Kitchen
           </button>
         )}
