@@ -37,17 +37,15 @@ import {
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
-// This block handles the dynamic injection of keys in the Canvas environment
-// while providing a fallback for local/external development.
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
   : {
-      apiKey: "", // Fill this in for GitHub/Vercel deployment
-      authDomain: "",
-      projectId: "",
-      storageBucket: "",
-      messagingSenderId: "",
-      appId: ""
+      apiKey: "AIzaSyD_YGPU1QiWCsbKk7i7uLTRdvwNjock5HQ",
+      authDomain: "stir-the-pot-game.firebaseapp.com",
+      projectId: "stir-the-pot-game",
+      storageBucket: "stir-the-pot-game.firebasestorage.app",
+      messagingSenderId: "490697693148",
+      appId: "1:490697693148:web:3515513c66df65f987e119"
     };
 
 // Initialize Firebase safely
@@ -64,7 +62,7 @@ if (isConfigValid) {
   }
 }
 
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'stir-the-pot-v2';
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'stir-the-pot-game';
 
 // --- Constants ---
 const ROUND_TIME = 60;
@@ -121,8 +119,7 @@ export default function App() {
   
   const introAudio = useRef(null);
 
-  // If Firebase is not configured (common on Vercel/GitHub if not set up), 
-  // show a helpful error screen instead of a white screen.
+  // If Firebase is not configured properly, show a helpful error screen
   if (!isConfigValid) {
     return (
       <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-8 text-center bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950">
@@ -131,16 +128,8 @@ export default function App() {
         </div>
         <h1 className="text-3xl font-black text-white mb-4 uppercase italic tracking-tighter">Missing Kitchen Equipment</h1>
         <p className="text-stone-400 max-w-md leading-relaxed mb-8">
-          The Firebase configuration is missing. To run this game on <span className="text-white font-bold">Vercel</span> or <span className="text-white font-bold">GitHub</span>, you must paste your Firebase API keys into the <code className="bg-stone-900 px-2 py-1 rounded text-orange-500">firebaseConfig</code> object in the code.
+          The Firebase configuration is missing or invalid. Please ensure your API key and Project ID are correctly set in the <code className="bg-stone-900 px-2 py-1 rounded text-orange-500">firebaseConfig</code> object.
         </p>
-        <div className="bg-stone-900 p-6 rounded-2xl border border-stone-800 text-left w-full max-w-sm">
-          <p className="text-xs font-bold text-stone-500 uppercase mb-2">Instructions:</p>
-          <ul className="text-sm text-stone-400 space-y-2 list-disc pl-4">
-            <li>Create a project at <a href="https://console.firebase.google.com" target="_blank" className="text-orange-500 underline">firebase.google.com</a></li>
-            <li>Enable <strong>Anonymous Auth</strong> and <strong>Firestore</strong></li>
-            <li>Copy your "Web App" config into the code</li>
-          </ul>
-        </div>
       </div>
     );
   }
