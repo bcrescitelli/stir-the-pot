@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { 
   getFirestore, 
   doc, 
@@ -32,14 +32,17 @@ import {
   Thermometer,
   Eraser,
   Wind,
-  Hand
+  Hand,
+  AlertCircle
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
+// This block handles the dynamic injection of keys in the Canvas environment
+// while providing a fallback for local/external development.
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
   : {
-      apiKey: "",
+      apiKey: "", // Fill this in for GitHub/Vercel deployment
       authDomain: "",
       projectId: "",
       storageBucket: "",
@@ -47,9 +50,19 @@ const firebaseConfig = typeof __firebase_config !== 'undefined'
       appId: ""
     };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialize Firebase safely
+let app, auth, db;
+const isConfigValid = firebaseConfig && firebaseConfig.apiKey !== "";
+
+if (isConfigValid) {
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } catch (e) {
+    console.error("Firebase Initialization Error:", e);
+  }
+}
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'stir-the-pot-v2';
 
@@ -108,6 +121,30 @@ export default function App() {
   
   const introAudio = useRef(null);
 
+  // If Firebase is not configured (common on Vercel/GitHub if not set up), 
+  // show a helpful error screen instead of a white screen.
+  if (!isConfigValid) {
+    return (
+      <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-8 text-center bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-orange-900/20 via-stone-950 to-stone-950">
+        <div className="bg-orange-600/20 p-6 rounded-full mb-6 border border-orange-500/50">
+          <AlertCircle className="text-orange-500" size={48} />
+        </div>
+        <h1 className="text-3xl font-black text-white mb-4 uppercase italic tracking-tighter">Missing Kitchen Equipment</h1>
+        <p className="text-stone-400 max-w-md leading-relaxed mb-8">
+          The Firebase configuration is missing. To run this game on <span className="text-white font-bold">Vercel</span> or <span className="text-white font-bold">GitHub</span>, you must paste your Firebase API keys into the <code className="bg-stone-900 px-2 py-1 rounded text-orange-500">firebaseConfig</code> object in the code.
+        </p>
+        <div className="bg-stone-900 p-6 rounded-2xl border border-stone-800 text-left w-full max-w-sm">
+          <p className="text-xs font-bold text-stone-500 uppercase mb-2">Instructions:</p>
+          <ul className="text-sm text-stone-400 space-y-2 list-disc pl-4">
+            <li>Create a project at <a href="https://console.firebase.google.com" target="_blank" className="text-orange-500 underline">firebase.google.com</a></li>
+            <li>Enable <strong>Anonymous Auth</strong> and <strong>Firestore</strong></li>
+            <li>Copy your "Web App" config into the code</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -118,7 +155,7 @@ export default function App() {
         }
       } catch (err) {
         console.error("Auth failed:", err);
-        setError("Connection failed.");
+        setError("Connection failed. Check your internet or Firebase rules.");
       }
     };
     initAuth();
@@ -127,7 +164,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!activeRoomCode || !user) return;
+    if (!activeRoomCode || !user || !db) return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', activeRoomCode);
     const unsubscribe = onSnapshot(roomRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -158,7 +195,7 @@ export default function App() {
   };
 
   const createRoom = async () => {
-    if (!user) return;
+    if (!user || !db) return;
     const newCode = generateRoomCode();
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', newCode);
     const initialData = {
@@ -188,11 +225,11 @@ export default function App() {
       setRole('HOST');
       setActiveRoomCode(newCode);
       setView('LOBBY');
-    } catch (e) { setError("Failed to create room."); }
+    } catch (e) { setError("Failed to create room. Check Firebase permissions."); }
   };
 
   const joinRoom = async () => {
-    if (!user || !inputCode || !playerName) {
+    if (!user || !inputCode || !playerName || !db) {
       setError("Name and Code required.");
       return;
     }
@@ -356,6 +393,7 @@ function IntermissionView({ roomCode, roomData, role, user, appId, requestPermis
   const currentRule = ROUND_RULES[roomData.currentRound - 1] || ROUND_RULES[0];
 
   const startCountdown = async () => {
+    if (!db) return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
     let count = 5;
     await updateDoc(roomRef, { intermissionTimer: count });
@@ -372,6 +410,7 @@ function IntermissionView({ roomCode, roomData, role, user, appId, requestPermis
   };
 
   const handleChefReady = async () => {
+    if (!db) return;
     await requestPermissions();
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
     await updateDoc(roomRef, { isChefReady: true });
@@ -435,11 +474,10 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   const [pantryShuffle, setPantryShuffle] = useState([]);
   const [sabProgress, setSabProgress] = useState(0); 
   const [dialRotation, setDialRotation] = useState(0); 
-  const [dialTarget, setDialTarget] = useState(0);
   
   const isChef = roomData.activeChefId === user.uid;
   const isHost = role === 'HOST';
-  const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+  const roomRef = db ? doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode) : null;
   const timerInterval = useRef(null);
   const motionRef = useRef({ lastX: 0, lastY: 0, lastZ: 0 });
 
@@ -447,7 +485,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
 
   // --- 1. Sabotage Suite ---
   const triggerSabotage = async (tid) => {
-    if (!tid) return;
+    if (!tid || !roomRef) return;
     const types = ['DRY', 'SCRUB', 'DIAL'];
     const type = types[Math.floor(Math.random() * types.length)];
     const updates = {};
@@ -461,6 +499,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   };
 
   const finishSab = async () => {
+    if (!roomRef) return;
     const updates = {}; updates[`sabotages.${user.uid}`] = null;
     await updateDoc(roomRef, updates);
     setSabProgress(0);
@@ -492,7 +531,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   }, [roomData.activeChefId, isHost]);
 
   const startTurn = async () => {
-    // Deck Logic: If empty, shuffle discard back in
+    if (!roomRef) return;
     let currentDeck = [...(roomData.deck || [])];
     let currentDiscard = [...(roomData.discard || [])];
     
@@ -525,6 +564,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   };
 
   const endShift = async () => {
+    if (!roomRef) return;
     const nextIdx = roomData.currentChefIndex + 1;
     const stats = { name: roomData.players[roomData.activeChefId]?.name, count: roomData.chefSuccessCount };
     
@@ -556,10 +596,8 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     }
   };
 
-  // Sync Timer Display
   useEffect(() => { if (roomData.timer > 0) setTimeLeft(roomData.timer); }, [roomData.timer]);
 
-  // UI Shuffle logic
   useEffect(() => {
     if (!isHost && roomData.status === 'PLAYING') {
       setPantryShuffle([...roomData.pantry].sort(() => Math.random() - 0.5));
@@ -567,10 +605,9 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   }, [roomData.currentIngredient, isHost, roomData.status]);
 
   const handleGuess = async (guess) => {
-    if (roomData.players[user.uid]?.isLockedOut || roomData.sabotages?.[user.uid]) return;
+    if (!roomRef || roomData.players[user.uid]?.isLockedOut || roomData.sabotages?.[user.uid]) return;
     
     if (guess === roomData.currentIngredient) {
-      // Correct! Draw next ingredient
       let currentDeck = [...(roomData.deck || [])];
       let currentDiscard = [...(roomData.discard || [])];
       
@@ -592,11 +629,9 @@ function GameView({ roomCode, roomData, user, role, appId }) {
       up[`players.${user.uid}.score`] = (roomData.players[user.uid]?.score || 0) + 500;
       up[`players.${roomData.activeChefId}.score`] = (roomData.players[roomData.activeChefId]?.score || 0) + 300;
       
-      // Unlock everyone
       Object.keys(roomData.players).forEach(id => { up[`players.${id}.isLockedOut`] = false; });
       await updateDoc(roomRef, up);
     } else {
-      // Wrong! 86'ed
       const up = {}; 
       up[`players.${user.uid}.isLockedOut`] = true;
       up[`players.${user.uid}.score`] = Math.max(0, (roomData.players[user.uid]?.score || 0) - 100);
@@ -605,7 +640,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
   };
 
   const skipIngredient = async () => {
-    if (!currentRule.allowSkip) return;
+    if (!roomRef || !currentRule.allowSkip) return;
     
     let currentDeck = [...(roomData.deck || [])];
     let currentDiscard = [...(roomData.discard || [])];
@@ -625,13 +660,12 @@ function GameView({ roomCode, roomData, user, role, appId }) {
     await updateDoc(roomRef, up);
   };
 
-  // Sabotage UI Components
   const renderSabotage = () => {
     const sab = roomData.sabotages[user.uid];
     
     if (sab.type === 'SCRUB') return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-blue-900" onPointerMove={(e) => { 
-          if (e.buttons > 0) { // Only if touching/clicking
+          if (e.buttons > 0) { 
             setSabProgress(p => { if (p >= 100) { finishSab(); return 100; } return p + 1.2; }); 
           }
       }}>
@@ -674,7 +708,6 @@ function GameView({ roomCode, roomData, user, role, appId }) {
       </div>
     );
 
-    // DRYING (Shake)
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-10 bg-blue-800">
         <Wind size={150} className="text-white animate-pulse" />
@@ -836,6 +869,7 @@ function ResultsView({ roomData, roomCode, role, appId }) {
   const isHost = role === 'HOST';
 
   const reset = async () => {
+    if (!db) return;
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
     const up = { status: 'LOBBY', currentRound: 1, currentChefIndex: 0, pantry: [], deck: [], completedIngredients: [], sabotages: {}, lastChefStats: null, isChefReady: false, intermissionTimer: 0 };
     Object.keys(roomData.players).forEach(id => { 
