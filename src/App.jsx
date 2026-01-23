@@ -332,6 +332,22 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
       return;
     }
     const cleanItems = items.map(i => i.trim().toUpperCase());
+    
+    // Check for duplicates in current submission
+    const uniqueSubmission = new Set(cleanItems);
+    if (uniqueSubmission.size !== cleanItems.length) {
+      setLocalError("Submission contains duplicates!");
+      return;
+    }
+
+    // Check against global pantry
+    const existingPantry = roomData.pantry || [];
+    const duplicate = cleanItems.find(item => existingPantry.includes(item));
+    if (duplicate) {
+      setLocalError(`DUPLICATE FOUND: "${duplicate}"`);
+      return;
+    }
+
     try {
       const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
       await updateDoc(roomRef, { pantry: arrayUnion(...cleanItems) });
@@ -395,7 +411,7 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
           {items.map((v, i) => (
             <div key={i} className="relative">
                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-500/30 font-black italic text-xl">{i+1}</span>
-               <input maxLength={30} type="text" placeholder="Add an item..." className="w-full bg-stone-900 pl-10 pr-4 py-4 rounded-xl font-black uppercase outline-none focus:border-orange-500 border-2 border-stone-800 transition-all text-lg" value={v} onChange={(e) => { const n = [...items]; n[i] = e.target.value; setItems(n); }} />
+               <input maxLength={30} type="text" placeholder="Add an item..." className={`w-full bg-stone-900 pl-10 pr-4 py-4 rounded-xl font-black uppercase outline-none focus:border-orange-500 border-2 ${localError.includes(v.toUpperCase()) && v !== '' ? 'border-red-500 animate-shake' : 'border-stone-800'} transition-all text-lg`} value={v} onChange={(e) => { const n = [...items]; n[i] = e.target.value; setItems(n); }} />
             </div>
           ))}
           {localError && <div className="p-3 bg-red-600/20 border border-red-500 text-red-500 font-black text-xs uppercase text-center rounded-xl">{localError}</div>}
@@ -765,19 +781,14 @@ function GameView({ roomCode, roomData, user, role, appId }) {
         
         <div className="flex-1 grid grid-cols-12 gap-8">
           <div className="col-span-8 bg-stone-900/40 rounded-[4rem] border-4 border-stone-900 p-12 flex flex-col items-center justify-center relative">
-             <div className="absolute top-10 text-center">
-                <p className="text-stone-600 font-black uppercase tracking-widest text-sm mb-2">The Current Order:</p>
-                <h3 className="text-6xl font-black italic uppercase leading-none text-white tracking-tighter">"{roomData.dishName}"</h3>
-             </div>
-             
              <div className="flex flex-col items-center gap-4 bg-white/5 p-10 rounded-[3rem] border border-white/10">
                 <p className="text-orange-500 font-black uppercase tracking-[0.5em] text-sm">Rules of the Kitchen:</p>
                 <h4 className="text-4xl font-black italic text-white uppercase">{currentRule.rule}</h4>
                 <p className="text-stone-500 font-bold uppercase text-xs">{currentRule.sub}</p>
              </div>
 
-             <div className="w-full max-w-2xl bg-stone-950 h-32 rounded-full border-4 border-stone-800 flex items-center px-6 gap-3 mt-16">
-                {roomData.completedIngredients.map((_, i) => <div key={i} className="flex-1 bg-orange-600 h-20 rounded-full flex items-center justify-center animate-bounce"><CheckCircle2 className="text-white" size={32} /></div>)}
+             <div className="w-full max-w-2xl bg-stone-950 h-32 rounded-full border-4 border-stone-800 flex items-center px-6 gap-3 mt-16 shadow-inner">
+                {roomData.completedIngredients.map((_, i) => <div key={i} className="flex-1 bg-orange-600 h-20 rounded-full flex items-center justify-center animate-in zoom-in"><CheckCircle2 className="text-white" size={32} /></div>)}
                 {Array.from({ length: Math.max(0, 5 - roomData.completedIngredients.length) }).map((_, i) => <div key={i} className="flex-1 h-20 rounded-full border-2 border-stone-800 border-dashed opacity-20"></div>)}
              </div>
           </div>
