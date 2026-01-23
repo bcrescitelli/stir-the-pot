@@ -119,6 +119,28 @@ export default function App() {
   
   const introAudio = useRef(null);
 
+  // Initialize Background Music
+  useEffect(() => {
+    introAudio.current = new Audio('intro.mp3');
+    introAudio.current.loop = true;
+    introAudio.current.volume = 0.6;
+    
+    return () => {
+      if (introAudio.current) {
+        introAudio.current.pause();
+        introAudio.current = null;
+      }
+    };
+  }, []);
+
+  // Handle Volume Ducking based on game status
+  useEffect(() => {
+    if (introAudio.current && roomData) {
+      const targetVolume = roomData.status === 'PLAYING' ? 0.15 : 0.6;
+      introAudio.current.volume = isMuted ? 0 : targetVolume;
+    }
+  }, [roomData?.status, isMuted]);
+
   // If Firebase is not configured properly, show a helpful error screen
   if (!isConfigValid) {
     return (
@@ -214,6 +236,10 @@ export default function App() {
       setRole('HOST');
       setActiveRoomCode(newCode);
       setView('LOBBY');
+      // Start Music
+      if (introAudio.current) {
+        introAudio.current.play().catch(e => console.log("Audio play blocked by browser. Interaction required."));
+      }
     } catch (e) { setError("Failed to create room. Check Firebase permissions."); }
   };
 
@@ -248,6 +274,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 font-sans selection:bg-orange-500 overflow-hidden">
+      {/* Audio Controls for Host */}
+      {role === 'HOST' && view !== 'LANDING' && view !== 'RESULTS' && (
+        <div className="fixed bottom-6 right-6 z-50 flex gap-3">
+          <button 
+            onClick={() => { if(introAudio.current) { introAudio.current.muted = !isMuted; setIsMuted(!isMuted); } }} 
+            className="p-4 bg-stone-800 rounded-full border-4 border-stone-700 shadow-2xl hover:bg-stone-700 transition-all active:scale-95"
+          >
+            {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+          </button>
+        </div>
+      )}
+      
       {view === 'LANDING' && <LandingView setInputCode={setInputCode} inputCode={inputCode} setPlayerName={setPlayerName} createRoom={createRoom} joinRoom={joinRoom} error={error} />}
       {view === 'LOBBY' && <LobbyView roomCode={activeRoomCode} roomData={roomData} role={role} user={user} appId={appId} />}
       {view === 'INTERMISSION' && <IntermissionView roomCode={activeRoomCode} roomData={roomData} role={role} user={user} appId={appId} requestPermissions={requestPermissions} />}
