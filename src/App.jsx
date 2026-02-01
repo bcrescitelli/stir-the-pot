@@ -257,7 +257,7 @@ export default function App() {
         score: 0,
         isLockedOut: false,
         ready: false,
-        sabotageCharges: 3 
+        sabotageCharges: 12 // UPDATED TO 12
       };
       await updateDoc(roomRef, updates);
       setRole('PLAYER');
@@ -355,7 +355,7 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
     const shuffledDeck = [...roomData.pantry].sort(() => Math.random() - 0.5);
     await updateDoc(roomRef, { 
       deck: shuffledDeck, 
-      discard: [],
+      discard: [], 
       status: 'INTERMISSION', 
       activeChefId: turnOrder[0],
       turnOrder: turnOrder,
@@ -751,7 +751,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              className="absolute inset-0 flex items-center justify-center transition-transform duration-75"
              style={{ transform: `rotate(${dialRotation}deg)` }}
            >
-              <div className="w-3 h-24 bg-orange-600 rounded-full absolute -top-1 shadow-lg border-2 border-white"></div>
+             <div className="w-3 h-24 bg-orange-600 rounded-full absolute -top-1 shadow-lg border-2 border-white"></div>
            </div>
            <div className="text-white font-black text-5xl tabular-nums drop-shadow-lg z-10">{Math.floor(dialRotation + 100)}°</div>
            <div className="absolute inset-4 rounded-full border border-white/5 pointer-events-none"></div>
@@ -777,11 +777,11 @@ function GameView({ roomCode, roomData, user, role, appId }) {
       <div className="flex flex-col h-screen p-8 gap-8 max-w-[1200px] mx-auto w-full">
         <div className="flex justify-between items-center bg-stone-900 border-4 border-stone-800 p-8 rounded-[3rem] shadow-2xl">
            <div className="flex items-center gap-6">
-              <div className="bg-orange-600 p-6 rounded-[1.5rem]"><ChefHat className="text-white" size={48} /></div>
-              <div>
-                <p className="text-orange-500 font-black uppercase text-xs tracking-widest">ROUND {roomData.currentRound}: {currentRule.title}</p>
-                <h2 className="text-5xl font-black uppercase italic tracking-tighter">{roomData.players[roomData.activeChefId]?.name}</h2>
-              </div>
+             <div className="bg-orange-600 p-6 rounded-[1.5rem]"><ChefHat className="text-white" size={48} /></div>
+             <div>
+               <p className="text-orange-500 font-black uppercase text-xs tracking-widest">ROUND {roomData.currentRound}: {currentRule.title}</p>
+               <h2 className="text-5xl font-black uppercase italic tracking-tighter">{roomData.players[roomData.activeChefId]?.name}</h2>
+             </div>
            </div>
            <div className={`p-6 rounded-[2rem] border-4 ${timeLeft < 15 ? 'border-red-600 text-red-500 animate-pulse' : 'border-stone-800 bg-stone-950 text-white'}`}>
              <span className="text-8xl font-black tabular-nums">{timeLeft}</span>
@@ -883,7 +883,7 @@ function GameView({ roomCode, roomData, user, role, appId }) {
              <div><p className="text-[10px] font-black uppercase text-stone-500">Wallet</p><p className="text-4xl font-black text-orange-500 tabular-nums">{roomData.players?.[user.uid]?.score || 0}</p></div>
              <div className="text-right">
                 <p className="text-[10px] font-black uppercase text-stone-500 tracking-widest">Sabotage</p>
-                <div className="flex gap-1 justify-end">{Array.from({ length: 3 }).map((_, i) => <Zap key={i} size={24} className={i < (roomData.players?.[user.uid]?.sabotageCharges || 0) ? 'text-blue-500 fill-blue-500' : 'text-stone-700'} />)}</div>
+                <div className="flex gap-1 justify-end">{Array.from({ length: 12 }).map((_, i) => <Zap key={i} size={24} className={i < (roomData.players?.[user.uid]?.sabotageCharges || 0) ? 'text-blue-500 fill-blue-500' : 'text-stone-700'} />)}</div>
              </div>
           </div>
           <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-stone-950">
@@ -922,7 +922,7 @@ function ResultsView({ roomData, roomCode, role, appId }) {
       up[`players.${id}.score`] = 0; 
       up[`players.${id}.ready`] = false; 
       up[`players.${id}.isLockedOut`] = false; 
-      up[`players.${id}.sabotageCharges`] = 3; 
+      up[`players.${id}.sabotageCharges`] = 12; // UPDATED TO 12
     });
     await updateDoc(roomRef, up);
   };
