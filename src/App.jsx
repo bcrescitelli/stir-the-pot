@@ -33,7 +33,8 @@ import {
   Eraser,
   Wind,
   Hand,
-  AlertCircle
+  AlertCircle,
+  BookOpen
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -316,6 +317,8 @@ function LandingView({ setInputCode, inputCode, setPlayerName, createRoom, joinR
 function LobbyView({ roomCode, roomData, role, user, appId }) {
   const [items, setItems] = useState(['', '', '', '', '']);
   const [localError, setLocalError] = useState('');
+  const [showRules, setShowRules] = useState(false); // NEW STATE FOR MODAL
+  
   const players = roomData?.players ? Object.values(roomData.players) : [];
   const isReady = roomData?.players?.[user.uid]?.ready;
   const isHost = role === 'HOST';
@@ -393,9 +396,21 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
     );
   }
 
+  // --- PLAYER VIEW ---
   return (
     <div className="min-h-screen p-6 flex flex-col bg-stone-950 overflow-y-auto pb-24">
-      <div className="text-center mb-8">
+      {/* SHOW MODAL */}
+      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+
+      <div className="text-center mb-8 relative">
+        {/* RULES BUTTON */}
+        <button 
+          onClick={() => setShowRules(true)}
+          className="absolute right-0 top-0 p-3 bg-stone-800 rounded-full border-2 border-stone-700 text-stone-400 hover:text-white hover:border-orange-500 transition-all"
+        >
+          <BookOpen size={24} />
+        </button>
+
         <h2 className="text-3xl font-black italic text-orange-500 uppercase tracking-tighter">Stock the Pantry</h2>
         <p className="text-stone-500 font-bold uppercase text-[10px] tracking-widest mt-2 px-8">Add your items below to stock the shared kitchen deck.</p>
       </div>
@@ -415,6 +430,11 @@ function LobbyView({ roomCode, roomData, role, user, appId }) {
           <CheckCircle2 size={80} className="text-green-500 animate-bounce" />
           <p className="text-4xl font-black uppercase italic tracking-tighter">Ready!</p>
           <p className="text-stone-500 font-black uppercase tracking-widest text-xs">Wait for Host to open the kitchen...</p>
+          
+          {/* ALSO ADD BUTTON HERE */}
+          <button onClick={() => setShowRules(true)} className="flex items-center gap-2 text-stone-500 hover:text-white font-bold uppercase text-xs tracking-widest border border-stone-800 px-6 py-3 rounded-full hover:bg-stone-900 transition-all">
+            <BookOpen size={16} /> Read Rules Again
+          </button>
         </div>
       )}
     </div>
@@ -951,6 +971,92 @@ function ResultsView({ roomData, roomCode, role, appId }) {
             Re-Open Kitchen
           </button>
         )}
+    </div>
+  );
+}
+
+// --- NEW COMPONENT: Rules Modal ---
+function RulesModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-stone-900 w-full max-w-lg max-h-[85vh] rounded-[2.5rem] border-4 border-stone-700 flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
+        
+        {/* Header */}
+        <div className="p-6 border-b-4 border-stone-800 flex justify-between items-center bg-stone-950 rounded-t-[2.2rem]">
+          <h2 className="text-3xl font-black uppercase italic text-orange-500 tracking-tighter">Chef's Manual</h2>
+          <button onClick={onClose} className="bg-stone-800 p-2 rounded-full hover:bg-red-600 transition-colors">
+            <Eraser size={24} className="text-white" />
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
+          
+          {/* Section 1: The Pantry */}
+          <section>
+            <div className="flex items-center gap-3 mb-2">
+              <Utensils className="text-orange-500" />
+              <h3 className="text-xl font-black uppercase text-white">1. Stock the Pantry</h3>
+            </div>
+            <p className="text-stone-400 font-bold text-sm leading-relaxed">
+              Don't just list vegetables! The "Ingredients" are actually <span className="text-white">prompts</span> for the chefs to describe. 
+              <br/><br/>
+              <span className="text-orange-500">Good Examples:</span> "A Smelly Gym Sock", "My Ex-Wife", "The Concept of Time".
+              <br/>
+              <span className="text-red-500">Bad Examples:</span> "Carrot", "Onion".
+            </p>
+          </section>
+
+          {/* Section 2: The Rounds */}
+          <section>
+            <div className="flex items-center gap-3 mb-2">
+              <Timer className="text-blue-500" />
+              <h3 className="text-xl font-black uppercase text-white">2. The Shifts</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
+                <p className="text-orange-500 font-black text-xs tracking-widest uppercase">Round 1</p>
+                <p className="font-bold text-white">Say Anything</p>
+                <p className="text-xs text-stone-500 mt-1">Describe the card freely. No skipping!</p>
+              </div>
+              <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
+                <p className="text-blue-500 font-black text-xs tracking-widest uppercase">Round 2</p>
+                <p className="font-bold text-white">One Word Only</p>
+                <p className="text-xs text-stone-500 mt-1">You can only say ONE word per card.</p>
+              </div>
+              <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
+                <p className="text-red-500 font-black text-xs tracking-widest uppercase">Round 3</p>
+                <p className="font-bold text-white">Charades & Sounds</p>
+                <p className="text-xs text-stone-500 mt-1">Act it out or make noises. No talking!</p>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 3: Sabotage */}
+          <section>
+            <div className="flex items-center gap-3 mb-2">
+              <Zap className="text-yellow-500" />
+              <h3 className="text-xl font-black uppercase text-white">3. Sabotage</h3>
+            </div>
+            <p className="text-stone-400 font-bold text-sm leading-relaxed mb-4">
+              You have <span className="text-white">12 Charges</span>. Use them to freeze other players' screens with mini-games!
+            </p>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-stone-800 p-2 rounded-lg"><Wind size={20} className="mx-auto mb-1 text-blue-400"/><span className="text-[10px] font-black uppercase">Shake</span></div>
+              <div className="bg-stone-800 p-2 rounded-lg"><Thermometer size={20} className="mx-auto mb-1 text-orange-400"/><span className="text-[10px] font-black uppercase">Dial</span></div>
+              <div className="bg-stone-800 p-2 rounded-lg"><HandMetal size={20} className="mx-auto mb-1 text-emerald-400"/><span className="text-[10px] font-black uppercase">Chop</span></div>
+            </div>
+          </section>
+
+        </div>
+        
+        {/* Footer */}
+        <div className="p-6 border-t-4 border-stone-800 bg-stone-950 rounded-b-[2.2rem]">
+          <button onClick={onClose} className="w-full bg-orange-600 py-4 rounded-xl font-black uppercase text-xl shadow-lg active:scale-95 transition-all">
+            Yes Chef!
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
